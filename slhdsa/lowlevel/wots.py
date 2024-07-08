@@ -53,7 +53,7 @@ class WOTS:
         for i in range(self.wots_parameter.len1):
             csum = csum + self.wots_parameter.w - 1 - msg[i]
         csum = csum << ((8 | -((self.wots_parameter.len2 * self.parameter.lgw) % 8)) % 8)
-        msg = msg + base2b(csum.to_bytes(ceil_div(self.wots_parameter.len2 * self.parameter.lgw, 8)),
+        msg = msg + base2b(csum.to_bytes(ceil_div(self.wots_parameter.len2 * self.parameter.lgw, 8), "big"),
                            self.parameter.lgw, self.wots_parameter.len2)
         return msg
 

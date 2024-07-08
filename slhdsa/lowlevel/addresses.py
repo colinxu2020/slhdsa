@@ -11,7 +11,7 @@ class Address:
     typ: int
 
     def to_bytes(self) -> bytes:
-        return self.layer.to_bytes(4) + self.tree.to_bytes(12) + self.typ.to_bytes(4)
+        return self.layer.to_bytes(4, "big") + self.tree.to_bytes(12, "big") + self.typ.to_bytes(4, "big")
 
     def with_type(self, typ: type[T]) -> T:
         return typ(self.layer, self.tree, typ.typ)
@@ -25,7 +25,7 @@ class WOTSHashAddress(Address):
     hash: int = 0
 
     def to_bytes(self) -> bytes:
-        return super().to_bytes() + self.keypair.to_bytes(4) + self.chain.to_bytes(4) + self.hash.to_bytes(4)
+        return super().to_bytes() + self.keypair.to_bytes(4, "big") + self.chain.to_bytes(4, "big") + self.hash.to_bytes(4, "big")
 
 
 @dataclass
@@ -34,7 +34,7 @@ class WOTSPKAddress(Address):
     keypair: int = 0
 
     def to_bytes(self) -> bytes:
-        return super().to_bytes() + self.keypair.to_bytes(4) + b'\x00' * 8
+        return super().to_bytes() + self.keypair.to_bytes(4, "big") + b'\x00' * 8
 
 
 @dataclass
@@ -44,7 +44,7 @@ class TreeAddress(Address):
     index: int = 0
 
     def to_bytes(self) -> bytes:
-        return super().to_bytes() + b'\x00' * 4 + self.height.to_bytes(4) + self.index.to_bytes(4)
+        return super().to_bytes() + b'\x00' * 4 + self.height.to_bytes(4, "big") + self.index.to_bytes(4, "big")
 
 
 @dataclass
@@ -55,7 +55,7 @@ class FORSTreeAddress(Address):
     index: int = 0
 
     def to_bytes(self) -> bytes:
-        return super().to_bytes() + self.keypair.to_bytes(4) + self.height.to_bytes(4) + self.index.to_bytes(4)
+        return super().to_bytes() + self.keypair.to_bytes(4, "big") + self.height.to_bytes(4, "big") + self.index.to_bytes(4, "big")
 
 
 @dataclass
@@ -64,7 +64,7 @@ class FORSRootsAddress(Address):
     keypair: int = 0
 
     def to_bytes(self) -> bytes:
-        return super().to_bytes() + self.keypair.to_bytes(4) + b'\x00' * 8
+        return super().to_bytes() + self.keypair.to_bytes(4, "big") + b'\x00' * 8
 
 
 @dataclass
@@ -75,7 +75,7 @@ class WOTSPrfAddress(Address):
     hash: int = 0
 
     def to_bytes(self) -> bytes:
-        return super().to_bytes() + self.keypair.to_bytes(4) + self.chain.to_bytes(4) + self.hash.to_bytes(4)
+        return super().to_bytes() + self.keypair.to_bytes(4, "big") + self.chain.to_bytes(4, "big") + self.hash.to_bytes(4, "big")
 
 
 @dataclass
@@ -86,4 +86,4 @@ class FORSPrfAddress(Address):
     index: int = 0
 
     def to_bytes(self) -> bytes:
-        return super().to_bytes() + self.keypair.to_bytes(4) + self.height.to_bytes(4) + self.index.to_bytes(4)
+        return super().to_bytes() + self.keypair.to_bytes(4, "big") + self.height.to_bytes(4, "big") + self.index.to_bytes(4, "big")
