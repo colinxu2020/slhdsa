@@ -31,12 +31,12 @@ def sign(msg: bytes, secret_key: tuple[bytes, ...], par: Parameter, randomize: b
     digest = par.Hmsg(r, pk_seed, pk_root, msg)
     md = digest[:ceil_div(par.k * par.a, 8)]
     tree_idx = int.from_bytes(
-        digest[ceil_div(par.k * par.a, 8):ceil_div(par.k * par.a, 8) + ceil_div(par.h - par.h // par.d, 8)])
+        digest[ceil_div(par.k * par.a, 8):ceil_div(par.k * par.a, 8) + ceil_div(par.h - par.h // par.d, 8)], "big")
     tree_idx %= 2 ** (par.h - par.h // par.d)
     leaf_idx = int.from_bytes(digest[
                              ceil_div(par.k * par.a, 8) + ceil_div(par.h - par.h // par.d, 8):ceil_div(par.k * par.a,
                                                                                                        8) + ceil_div(
-                                 par.h - par.h // par.d, 8) + ceil_div(par.h, 8 * par.d)])
+                                 par.h - par.h // par.d, 8) + ceil_div(par.h, 8 * par.d)], "big")
     leaf_idx %= 2 ** (par.h // par.d)
     address.tree = tree_idx
     address.keypair = leaf_idx
@@ -60,17 +60,15 @@ def verify(msg: bytes, sig: bytes, public_key: tuple[bytes, ...], par: Parameter
     digest = par.Hmsg(r, pk_seed, pk_root, msg)
     md = digest[:ceil_div(par.k * par.a, 8)]
     tree_id = int.from_bytes(
-        digest[ceil_div(par.k * par.a, 8):ceil_div(par.k * par.a, 8) + ceil_div(par.h - par.h // par.d, 8)])
+        digest[ceil_div(par.k * par.a, 8):ceil_div(par.k * par.a, 8) + ceil_div(par.h - par.h // par.d, 8)], "big")
     tree_id %= 2 ** (par.h - par.h // par.d)
     leaf_id = int.from_bytes(digest[
                              ceil_div(par.k * par.a, 8) + ceil_div(par.h - par.h // par.d, 8):ceil_div(par.k * par.a,
                                                                                                        8) + ceil_div(
-                                 par.h - par.h // par.d, 8) + ceil_div(par.h, 8 * par.d)])
+                                 par.h - par.h // par.d, 8) + ceil_div(par.h, 8 * par.d)], "big")
     leaf_id %= 2 ** (par.h // par.d)
     address.tree = tree_id
     address.keypair = leaf_id
     fors = FORS(par)
     fors_pk = fors.publickey_from_sign(fors_sign, md, pk_seed, address)
-    #print(fors_pk, fors_sign)
-    #fors_pk = b'|\x94\xc3\xf2Sk4\xe8\xca\xbf\xf9\xef\xd9\x1b\xced'
     return ht_verify(fors_pk, ht_sign_, pk_seed, tree_id, leaf_id, pk_root, par)
