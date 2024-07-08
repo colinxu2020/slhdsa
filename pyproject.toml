@@ -1,12 +1,11 @@
 [project]
 name = "SLH-DSA"
-version = "0.1.0"
+version = "0.1.1"
 description = "The pure python impl of the slh-das algorithm(based on fips205)."
 authors = [
     {name = "Colinxu2020", email = "colinxu2020@gmail.com"},
 ]
 dependencies = [
-    "pytest-cov>=5.0.0",
 ]
 requires-python = ">=3.9"
 readme = "README.md"
@@ -24,4 +23,5 @@ distribution = true
 dev = [
     "pytest>=8.2.2",
     "mypy>=1.10.1",
+    "pytest-cov>=5.0.0",
 ]
