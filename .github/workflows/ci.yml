@@ -1,0 +1,66 @@
+# This workflow will install Python dependencies, run tests and lint with a variety of Python versions
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
+
+name: Test And Build
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  test:
+
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v3
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install dependencies
+      run: |
+        python -m pip install pdm
+        python -m pdm install
+        python -m pdm install -dG dev
+    - name: Test with pytest
+      run: |
+        python -m pdm run pytest tests --cov --cov-report xml:cov.xml
+    - name: Check with mypy
+      run: |
+        python -m pdm run mypy slhdsa --disallow-untyped-defs
+    - name: Upload coverage reports to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        files: ./cov.xml
+  
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v3
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install dependencies
+      run: |
+        python -m pip install pdm
+        python -m pdm install --prod
+    - name: Build
+      run: |
+        python -m pdm build --no-sdist
+    - name: Upload package
+      uses: actions/upload-artifact@v3
+      with:
+        name: slhdsa.whl
+        path: dist/slhdsa-0.1.0-py3-none-any.whl
+      
