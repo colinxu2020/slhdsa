@@ -5,7 +5,7 @@ from slhdsa.lowlevel.addresses import Address, FORSTreeAddress
 from slhdsa.lowlevel.xmss import XMSS
 from slhdsa.lowlevel._utils import ceil_div
 from slhdsa.lowlevel.fors import FORS
-from slhdsa.lowlevel.hypertree import sign as ht_sign, verify as ht_verify
+from slhdsa.lowlevel.hypertree import HyperTree
 from slhdsa.lowlevel.wots import WOTSParameter
 
 
@@ -44,8 +44,8 @@ def sign(msg: bytes, secret_key: tuple[bytes, ...], par: Parameter, randomize: b
     fors_sign = fors.sign(md, sk_seed, pk_seed, address)
     sig += fors_sign
     fors_pk = fors.publickey_from_sign(fors_sign, md, pk_seed, address)
-    ht_sign_ = ht_sign(fors_pk, sk_seed, pk_seed, tree_idx, leaf_idx, par)
-    sig += ht_sign_
+    ht_sign = HyperTree(par).sign(fors_pk, sk_seed, pk_seed, tree_idx, leaf_idx)
+    sig += ht_sign
     return sig
 
 
@@ -69,6 +69,5 @@ def verify(msg: bytes, sig: bytes, public_key: tuple[bytes, ...], par: Parameter
     leaf_id %= 2 ** (par.h // par.d)
     address.tree = tree_id
     address.keypair = leaf_id
-    fors = FORS(par)
-    fors_pk = fors.publickey_from_sign(fors_sign, md, pk_seed, address)
-    return ht_verify(fors_pk, ht_sign_, pk_seed, tree_id, leaf_id, pk_root, par)
+    fors_pk = FORS(par).publickey_from_sign(fors_sign, md, pk_seed, address)
+    return HyperTree(par).verify(fors_pk, ht_sign_, pk_seed, tree_id, leaf_id, pk_root)

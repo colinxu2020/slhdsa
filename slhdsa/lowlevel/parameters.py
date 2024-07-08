@@ -31,7 +31,7 @@ def shake_functions(n: int, m: int) -> tuple[Callable[..., bytes], ...]:
         return shake_256(r + pk_seed + pk_root + msg).digest(m)
 
     def prf(pk_seed: bytes, sk_seed: bytes, address: Address) -> bytes:
-        return shake_256(pk_seed + address.to_bytes() + sk_seed).digest(n)
+        return shake_256(pk_seed +  address.to_bytes() + sk_seed).digest(n)
 
     def prf_msg(sk_prf: bytes, opt_rand: bytes, msg: bytes) -> bytes:
         return shake_256(sk_prf + opt_rand + msg).digest(n)
@@ -110,7 +110,7 @@ def sha2_35_functions(n: int, m: int) -> tuple[Callable[..., bytes], ...]:
         return mgf1_sha512(r + pk_seed + sha512(r + pk_seed + pk_root + msg).digest(), m)
 
     def prf(pk_seed: bytes, sk_seed: bytes, address: Address) -> bytes:
-        return trunc(sha256(pk_seed + b"\x00" * (64 - n) + compact_address(address.to_bytes() + sk_seed)).digest(), n)
+        return trunc(sha256(pk_seed + b"\x00" * (64 - n) + compact_address(address.to_bytes()) + sk_seed).digest(), n)
 
     def prf_msg(sk_prf: bytes, opt_rand: bytes, msg: bytes) -> bytes:
         return trunc(hmac_digest(sk_prf, opt_rand + msg, "sha512"), n)
