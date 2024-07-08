@@ -5,7 +5,9 @@ description = "The pure python impl of the slh-das algorithm(based on fips205)."
 authors = [
     {name = "Colinxu2020", email = "colinxu2020@gmail.com"},
 ]
-dependencies = []
+dependencies = [
+    "pytest-cov>=5.0.0",
+]
 requires-python = ">=3.9"
 readme = "README.md"
 license = {text = "AGPL-3.0-or-later"}
