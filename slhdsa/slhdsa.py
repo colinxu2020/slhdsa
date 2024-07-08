@@ -63,5 +63,5 @@ class KeyPair:
         return self.pub.digest() + self.sec.digest()
 
     @classmethod
-    def from_digest(cls, digest: bytes, par: Parameter):
+    def from_digest(cls, digest: bytes, par: Parameter) -> "KeyPair":
         return cls(PublicKey.from_digest(digest[:par.n*2], par), SecretKey.from_digest(digest[par.n*2:], par))
