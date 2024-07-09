@@ -17,8 +17,13 @@ def keygen(par: Parameter) -> tuple[tuple[bytes, bytes, bytes, bytes], tuple[byt
     pk_root = XMSS(par).node(sk_seed, 0, par.h_m, pk_seed, address)
     return (sk_seed, sk_prf, pk_seed, pk_root), (pk_seed, pk_root)
 
+def validate_secretkey(secret_key: tuple[bytes, bytes, bytes, bytes], par: Parameter) -> bool:
+    sk_seed, pk_prf, pk_seed, pk_root = secret_key
+    address = Address(par.d - 1, 0, 0)
+    pk_root_new = XMSS(par).node(sk_seed, 0, par.h_m, pk_seed, address)
+    return pk_root == pk_root_new
 
-def sign(msg: bytes, secret_key: tuple[bytes, ...], par: Parameter, randomize: bool = False) -> bytes:
+def sign(msg: bytes, secret_key: tuple[bytes, bytes, bytes, bytes], par: Parameter, randomize: bool = False) -> bytes:
     address = FORSTreeAddress(0, 0)
     sk_seed, sk_prf, pk_seed, pk_root = secret_key
     if randomize:
@@ -49,7 +54,7 @@ def sign(msg: bytes, secret_key: tuple[bytes, ...], par: Parameter, randomize: b
     return sig
 
 
-def verify(msg: bytes, sig: bytes, public_key: tuple[bytes, ...], par: Parameter) -> bool:
+def verify(msg: bytes, sig: bytes, public_key: tuple[bytes, bytes], par: Parameter) -> bool:
     if len(sig) != (1 + par.k * (par.a + 1) + par.h + par.d * WOTSParameter(par).len) * par.n:
         return False
     address = FORSTreeAddress(0, 0)

@@ -10,6 +10,31 @@ dependencies = [
 requires-python = ">=3.9"
 readme = "README.md"
 license = {text = "LGPL-3.0-or-later"}
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Topic :: Security",
+  "Topic :: Security :: Cryptography",
+  "Topic :: Software Development",
+  "Topic :: Software Development :: Libraries",
+  "Typing :: Typed",
+  "License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Operating System :: OS Independent"
+]
+keywords = ['fips205', 'slhdsa', 'sphincs', 'sphincsplus', 'crypto', 'cryptography']
+
+[project.urls]
+"Homepage" = "https://github.com/colinxu2020/slhdsa"
+"Bug Tracker" = "https://github.com/colinxu2020/slhdsa/issues"
 
 [build-system]
 requires = ["pdm-backend"]

@@ -21,6 +21,8 @@ class PublicKey:
 
     @classmethod
     def from_digest(cls, digest: bytes, par: Parameter) -> "PublicKey":
+        if len(digest) != 2 * par.n:
+            raise exc.SLHDSAKeyException('Wrong digest length')
         return cls((digest[:par.n], digest[par.n:]), par)
 
 
@@ -29,17 +31,25 @@ class SecretKey:
     key: tuple[bytes, bytes, bytes, bytes]
     par: Parameter
 
+    def __init__(self, key: tuple[bytes, bytes, bytes, bytes], par: Parameter):
+        if not lowlevel.validate_secretkey(key, par):
+            raise exc.SLHDSAKeyException("Invalid secret key")
+        self.key = key
+        self.par = par
+
     def sign(self, msg: bytes, randomize: bool = False) -> bytes:
         try:
             return lowlevel.sign(msg, self.key, self.par, randomize)
         except Exception:
-            raise exc.SLHDSAVerifyException
+            raise exc.SLHDSASignException
 
     def digest(self) -> bytes:
         return b''.join(self.key)
 
     @classmethod
     def from_digest(cls, digest: bytes, par: Parameter) -> "SecretKey":
+        if len(digest) != 4 * par.n:
+            raise exc.SLHDSAKeyException("Wrong digest length")
         return cls((digest[:par.n], digest[par.n:par.n*2], digest[par.n*2:par.n*3], digest[par.n*3:]), par)
 
 

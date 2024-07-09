@@ -6,3 +6,6 @@ class SLHDSAVerifyException(SLHDSAException):
 
 class SLHDSASignException(SLHDSAException):
     pass
+    
+class SLHDSAKeyException(SLHDSAException):
+    pass
