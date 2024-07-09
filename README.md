@@ -1,4 +1,9 @@
 # SLH-DSA
+[![Test And Build](https://github.com/colinxu2020/slhdsa/actions/workflows/ci.yml/badge.svg)](https://github.com/colinxu2020/slhdsa/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/github/colinxu2020/slhdsa/graph/badge.svg?token=OAQXHYD9TM)](https://codecov.io/github/colinxu2020/slhdsa)
+![PyPI - Downloads](https://img.shields.io/pypi/dm/slh-dsa)
+![GitHub License](https://img.shields.io/github/license/colinxu2020/slhdsa)
+
 The SLH-DSA project implements the stateless-hash digital signing algorithm(standardizing fips 205, adopted on Sphincs-Plus algorithm) in pure Python.
 
 This project offers those future:
