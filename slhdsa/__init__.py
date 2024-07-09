@@ -1,9 +1,9 @@
 from slhdsa.slhdsa import PublicKey, SecretKey, KeyPair
 from slhdsa.parameters import *  # noqa: F403
-from slhdsa.exception import SLHDSAException, SLHDSASignException, SLHDSAVerifyException
+from slhdsa.exception import SLHDSAException, SLHDSASignException, SLHDSAVerifyException, SLHDSAKeyException
 
 
-__all__ = ["PublicKey", "SecretKey", "KeyPair", "SLHDSAException", "SLHDSASignException", "SLHDSAVerifyException"]
+__all__ = ["PublicKey", "SecretKey", "KeyPair", "SLHDSAException", "SLHDSASignException", "SLHDSAVerifyException", "SLHDSAKeyException"]
 for algo in ["shake", "sha2"]:
     for size in ["128", "192", "256"]:
         for suffix in ["s", "f"]:

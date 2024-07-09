@@ -1,7 +1,10 @@
 from random import randbytes, randint
 
+from pytest import raises
+
 from slhdsa import KeyPair, sha2_128s, sha2_128f, sha2_192s, sha2_192f, sha2_256s, sha2_256f
 from slhdsa import shake_128s, shake_128f, shake_192s, shake_192f, shake_256s, shake_256f
+from slhdsa import SLHDSAKeyException, PublicKey, SecretKey
 
 
 def _for_all(judger):
@@ -94,3 +97,21 @@ def test5():
         sig3 = randbytes(10) + sig[10:]
         assert not kp.verify(msg, sig3)
     _for_all(judge)
+    
+def test6():
+    def judge(para):
+        pk = KeyPair.gen(para).pub.digest()[:-1]
+        with raises(SLHDSAKeyException):
+            PublicKey.from_digest(pk, para)
+        sk = KeyPair.gen(para).sec.digest()[:-1]
+        with raises(SLHDSAKeyException):
+            SecretKey.from_digest(sk, para)
+        with raises(SLHDSAKeyException):
+            SecretKey.from_digest(sk+b'a', para)
+        kp = KeyPair.gen(para).digest()[:-1]
+        with raises(SLHDSAKeyException):
+            KeyPair.from_digest(kp, para)
+        with raises(SLHDSAKeyException):
+            KeyPair.from_digest(kp+b'a', para)
+    _for_all(judge)
+    
