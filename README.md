@@ -7,12 +7,12 @@
 The SLH-DSA project implements the stateless-hash digital signing algorithm(standardizing fips 205, adopted on Sphincs-Plus algorithm) in pure Python.
 
 This project offers those future:
-1. 🍻 Zero dependencies;
-2. 🏷️ 100% type hint for all the codes;
-3. ✅ Extreme good 98% test coverage;
+1. 🍻 Zero dependencies!
+2. 🏷️ 100% type hint for all the codes!
+3. ✅ Extreme good 99% test coverage!
 4. 🔖 Support any newer python version!
 5. ⚒️ Design for Human!
-6. :tada: More futures coming soon!
+6. 🎉 More futures coming soon!
 
 
 The functionality is extremely simple to use, as demonstrated by the following example:
