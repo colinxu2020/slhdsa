@@ -10,7 +10,6 @@ if sys.version_info < (3, 9, 0):
     exit(1)
 
 from setuptools import Extension, find_packages, setup
-from setuptools.command.build_py import build_py
 
 try:
     import tomllib
@@ -18,7 +17,7 @@ except ModuleNotFoundError:
     import tomli as tomllib
 
 
-if os.getenv('SLHDSA_BUILD_OPTIMIZED', '0') == '1':
+if os.getenv('SLHDSA_BUILD_OPTIMIZED', '1') == '1':
     mypyc_targets = []
     print('Building Optimized Library')
     
