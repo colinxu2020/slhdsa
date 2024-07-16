@@ -25,6 +25,9 @@ class PublicKey:
             raise exc.SLHDSAKeyException('Wrong digest length')
         return cls((digest[:par.n], digest[par.n:]), par)
 
+    def __str__(self):
+        return f'<SLHDSA Public Key: {self.digest().hex()}>'
+
 
 @dataclass
 class SecretKey:
@@ -51,6 +54,9 @@ class SecretKey:
         if len(digest) != 4 * par.n:
             raise exc.SLHDSAKeyException("Wrong digest length")
         return cls((digest[:par.n], digest[par.n:par.n*2], digest[par.n*2:par.n*3], digest[par.n*3:]), par)
+
+    def __str__(self):
+        return f'<SLHDSA Secret Key: {self.digest().hex()}>'
 
 
 @dataclass

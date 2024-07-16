@@ -1,7 +1,7 @@
 [project]
 name = "SLH-DSA"
 version = "0.1.3"
-description = "The pure python impl of the slh-das algorithm(based on fips205)."
+description = "The pure python implement of the slh-dsa algorithm(based on fips205)."
 authors = [
     {name = "Colinxu2020", email = "colinxu2020@gmail.com"},
 ]
@@ -37,9 +37,8 @@ keywords = ['fips205', 'slhdsa', 'sphincs', 'sphincsplus', 'crypto', 'cryptograp
 "Bug Tracker" = "https://github.com/colinxu2020/slhdsa/issues"
 
 [build-system]
-requires = ["pdm-backend"]
-build-backend = "pdm.backend"
-
+requires = ["setuptools>=61", "wheel", "mypy>=1.10.1", "tomli>=1.1.0; python_version<'3.11'"]
+build-backend = "setuptools.build_meta"
 
 [tool.pdm]
 distribution = true

@@ -8,13 +8,13 @@ T = TypeVar("T", bound="Address")
 class Address:
     layer: int
     tree: int
-    typ: int
+    typ: int = 0
 
     def to_bytes(self) -> bytes:
         return self.layer.to_bytes(4, "big") + self.tree.to_bytes(12, "big") + self.typ.to_bytes(4, "big")
 
     def with_type(self, typ: type[T]) -> T:
-        return typ(self.layer, self.tree, typ.typ)
+        return typ(self.layer, self.tree)
 
 
 @dataclass
