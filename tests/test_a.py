@@ -103,15 +103,19 @@ def test6():
         pk = KeyPair.gen(para).pub.digest()[:-1]
         with raises(SLHDSAKeyException):
             PublicKey.from_digest(pk, para)
-        sk = KeyPair.gen(para).sec.digest()[:-1]
+        sk = KeyPair.gen(para).sec.digest()
+        newchar = chr((ord(sk[-1].decode())+1)%256).encode()
+        sk = sk[:-1]
         with raises(SLHDSAKeyException):
             SecretKey.from_digest(sk, para)
         with raises(SLHDSAKeyException):
-            SecretKey.from_digest(sk+b'a', para)
-        kp = KeyPair.gen(para).digest()[:-1]
+            SecretKey.from_digest(sk+newchar, para)
+        kp = KeyPair.gen(para).digest()
+        newchar = chr((ord(kp[-1].decode())+1)%256).encode()
+        kp = kp[:-1]
         with raises(SLHDSAKeyException):
             KeyPair.from_digest(kp, para)
         with raises(SLHDSAKeyException):
-            KeyPair.from_digest(kp+b'a', para)
+            KeyPair.from_digest(kp+newchar, para)
     _for_all(judge)
     
