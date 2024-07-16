@@ -104,14 +104,14 @@ def test6():
         with raises(SLHDSAKeyException):
             PublicKey.from_digest(pk, para)
         sk = KeyPair.gen(para).sec.digest()
-        newchar = chr((ord(sk[-1].decode())+1)%256).encode()
+        newchar = chr((sk[-1]+1)%256).encode()
         sk = sk[:-1]
         with raises(SLHDSAKeyException):
             SecretKey.from_digest(sk, para)
         with raises(SLHDSAKeyException):
             SecretKey.from_digest(sk+newchar, para)
         kp = KeyPair.gen(para).digest()
-        newchar = chr((ord(kp[-1].decode())+1)%256).encode()
+        newchar = chr((kp[-1]+1)%256).encode()
         kp = kp[:-1]
         with raises(SLHDSAKeyException):
             KeyPair.from_digest(kp, para)
