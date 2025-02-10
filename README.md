@@ -28,7 +28,7 @@ sig = kp.sign(b"Hello World!", randomize = True)  # sign the message randomized
 kp.verify(b"Hello World!", sig)  # -> True
 
 digest = kp.pub.digest()  # generate the digest of the public key so that other device could verify the sign
-pub = PublicKey.from_digest(digest)  # generate public key
+pub = PublicKey.from_digest(digest, shake_256f)  # recovery public key
 pub.verify(b"Hello World!", sig)  # -> True
 pub.verify(b"Hello World", sig)  # -> False
 ```
