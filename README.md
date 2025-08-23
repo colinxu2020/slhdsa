@@ -1,5 +1,5 @@
 # SLH-DSA
-[![Test And Build](https://github.com/colinxu2020/slhdsa/actions/workflows/ci.yml/badge.svg)](https://github.com/colinxu2020/slhdsa/actions/workflows/ci.yml)
+[![CI](https://github.com/colinxu2020/slhdsa/actions/workflows/ci.yml/badge.svg)](https://github.com/colinxu2020/slhdsa/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/github/colinxu2020/slhdsa/graph/badge.svg?token=OAQXHYD9TM)](https://codecov.io/github/colinxu2020/slhdsa)
 ![PyPI - Downloads](https://img.shields.io/pypi/dm/slh-dsa)
 ![GitHub License](https://img.shields.io/github/license/colinxu2020/slhdsa)
@@ -35,6 +35,6 @@ pub.verify(b"Hello World", sig)  # -> False
 
 ## Copyright
 
-Copyright(c) Colinxu2020 2024 All Rights Reserved.
+Copyright(c) Colinxu2020 2024-2025 All Rights Reserved.
 
 This software is licensed under GNU Lesser General Public License Version 3 or later(on your option).
