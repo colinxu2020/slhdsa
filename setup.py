@@ -17,7 +17,7 @@ except ModuleNotFoundError:
     import tomli as tomllib
 
 
-if os.getenv('SLHDSA_BUILD_OPTIMIZED', '1') == '1':
+if os.getenv('SLHDSA_BUILD_OPTIMIZED', '0') == '1':
     mypyc_targets = []
     print('Building Optimized Library')
     
