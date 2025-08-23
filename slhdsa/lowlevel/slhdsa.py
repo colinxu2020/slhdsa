@@ -13,14 +13,14 @@ def keygen(par: Parameter) -> tuple[tuple[bytes, bytes, bytes, bytes], tuple[byt
     sk_seed = token_bytes(par.n)
     sk_prf = token_bytes(par.n)
     pk_seed = token_bytes(par.n)
-    address = Address(par.d - 1, 0, 0)
+    address = Address(par.d - 1, 0)  # ?
     pk_root = XMSS(par).node(sk_seed, 0, par.h_m, pk_seed, address)
     return (sk_seed, sk_prf, pk_seed, pk_root), (pk_seed, pk_root)
 
 def validate_secretkey(secret_key: tuple[bytes, bytes, bytes, bytes], par: Parameter) -> bool:
     sk_seed, sk_prf, pk_seed, pk_root = secret_key
     len(sk_prf)  # magic patch for mypyc, otherwise mypyc will crash
-    address = Address(par.d - 1, 0, 0)
+    address = Address(par.d - 1, 0)  # ?
     pk_root_new = XMSS(par).node(sk_seed, 0, par.h_m, pk_seed, address)
     return pk_root == pk_root_new
 

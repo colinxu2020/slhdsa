@@ -49,3 +49,12 @@ dev = [
     "mypy>=1.10.1",
     "pytest-cov>=5.0.0",
 ]
+
+[tool.cibuildwheel.linux]
+before-all = "export SLHDSA_BUILD_OPTIMIZED=1"
+
+[tool.cibuildwheel.macos]
+before-all = "export SLHDSA_BUILD_OPTIMIZED=1"
+
+[tool.cibuildwheel.windows]
+before-all = "set SLHDSA_BUILD_OPTIMIZED=1"

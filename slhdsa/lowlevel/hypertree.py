@@ -12,7 +12,7 @@ class HyperTree:
     parameter: Parameter
 
     def sign(self, msg: bytes, sk_seed: bytes, pk_seed: bytes, tree_idx: int, leaf_idx: int) -> bytes:
-        address = Address(0, tree_idx, 0)
+        address = Address(0, tree_idx)  # ?
         tree = XMSS(self.parameter)
         ht_sign = tmp_sign = tree.sign(msg, sk_seed, leaf_idx, pk_seed, address)
         root = tree.public_key_from_sign(leaf_idx, tmp_sign, msg, pk_seed, address)
@@ -29,7 +29,7 @@ class HyperTree:
 
 
     def verify(self, msg: bytes, ht_sign: bytes, pk_seed: bytes, tree_idx: int, leaf_idx: int, pk_root: bytes) -> bool:
-        address = Address(0, tree_idx, 0)
+        address = Address(0, tree_idx)  # ?
         wots_par = WOTSParameter(self.parameter)
         tmp_sign = ht_sign[:(self.parameter.h_m + wots_par.len) * self.parameter.n]
         tree = XMSS(self.parameter)
