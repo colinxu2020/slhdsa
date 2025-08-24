@@ -9,7 +9,7 @@ The SLH-DSA project implements the stateless-hash digital signing algorithm(stan
 This project offers those future:
 1. 🍻 Zero dependencies!
 2. 🏷️ 100% type hint for all the codes!
-3. ✅ Extreme good 99% test coverage!
+3. ✅ Complete 100% test coverage!
 4. 🔖 Support any newer python version!
 5. ⚒️ Design for Human!
 6. 🎉 More futures coming soon!
