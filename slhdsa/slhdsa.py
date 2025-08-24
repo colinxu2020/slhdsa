@@ -11,10 +11,7 @@ class PublicKey:
     par: Parameter
 
     def verify(self, msg: bytes, sig: bytes) -> bool:
-        try:
-            return lowlevel.verify(msg, sig, self.key, self.par)
-        except Exception:
-            raise exc.SLHDSAVerifyException
+        return lowlevel.verify(msg, sig, self.key, self.par)
 
     def digest(self) -> bytes:
         return b''.join(self.key)
@@ -41,10 +38,7 @@ class SecretKey:
         self.par = par
 
     def sign(self, msg: bytes, randomize: bool = False) -> bytes:
-        try:
-            return lowlevel.sign(msg, self.key, self.par, randomize)
-        except Exception:
-            raise exc.SLHDSASignException
+        return lowlevel.sign(msg, self.key, self.par, randomize)
 
     def digest(self) -> bytes:
         return b''.join(self.key)
