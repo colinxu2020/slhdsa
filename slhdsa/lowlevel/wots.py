@@ -26,8 +26,8 @@ class WOTS:
     parameter: Parameter
 
     def _chain(self, key: bytes, beg: int, step: int, pk_seed: bytes, address: WOTSHashAddress) -> bytes:
-        if beg + step >= self.wots_parameter.w:
-            return b""
+        #if beg + step >= self.wots_parameter.w:
+        #    return b""
         tmp = key
         for j in range(beg, beg + step):
             address.hash = j
