@@ -38,7 +38,7 @@ else:
 
 metadata = tomllib.load(open('pyproject.toml', 'rb'))['project']
 setup(
-    name = "slhdsa",
+    name = "slh-dsa",
     version = metadata['version'],
     description = metadata['description'],
     long_description = open('README.md', encoding='utf8').read(),
@@ -48,7 +48,7 @@ setup(
     license = metadata["license"],
     py_modules = [],
     ext_modules = ext_modules,
-    packages = find_packages(),
+    packages = ['slhdsa'],
     classifiers = metadata["classifiers"],
     install_requires = metadata["dependencies"],
     python_requires = metadata["requires-python"],
