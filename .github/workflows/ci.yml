@@ -8,7 +8,9 @@ on:
     branches: [ "master" ]
   pull_request:
     branches: [ "master" ]
-  workflow_dispatch:
+  release:
+    types:
+      - published
 
 jobs:
   test:
@@ -48,7 +50,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-13, macos-14]
+        os: [ubuntu-latest, ubuntu-24.04-arm, windows-latest, windows-11-arm, macos-13, macos-14]
 
     steps:
       - uses: actions/checkout@v5
@@ -75,7 +77,7 @@ jobs:
           python -m pdm install --prod
       - name: Build
         run: |
-          python -m pdm build --no-sdist
+          python -m pdm build
         env:
           SLHDSA_BUILD_OPTIMIZED: "0"
 
@@ -83,3 +85,24 @@ jobs:
         with:
           name: slhdsa-unoptimized-wheels-${{ strategy.job-index }}
           path: ./dist/*.whl
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: slhdsa-sdist-${{ strategy.job-index }}
+          path: ./dist/*.tar.gz
+          
+  upload_pypi:
+    needs: [build_optimized, build_unoptimized]
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    if: github.event_name == 'release' && github.event.action == 'published'
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          pattern: slhdsa-*
+          path: dist
+          merge-multiple: true
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
