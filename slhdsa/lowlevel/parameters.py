@@ -9,6 +9,7 @@ from slhdsa.lowlevel._utils import trunc, compact_address
 
 @dataclass
 class Parameter:
+    oid_no: int
     n: int
     h: int
     d: int
@@ -23,6 +24,10 @@ class Parameter:
     F: Callable[[bytes, Address, bytes], bytes]
     H: Callable[[bytes, Address, bytes], bytes]
     Tl: Callable[[bytes, Address, bytes], bytes]
+    
+    @property
+    def openid(self):
+        return (2, 16, 840, 1, 101, 3, 4, 3, self.oid_no)
 
 
 # Declare the shake parameters defined in fIPS205
@@ -48,12 +53,12 @@ def shake_functions(n: int, m: int) -> tuple[Callable[..., bytes], ...]:
     return h_msg, prf, prf_msg, f, h, t_l
 
 
-shake_128s: Parameter = Parameter(16, 63, 7, 9, 12, 14, 4, 30, *shake_functions(16, 30))
-shake_128f: Parameter = Parameter(16, 66, 22, 3, 6, 33, 4, 34, *shake_functions(16, 35))
-shake_192s: Parameter = Parameter(24, 63, 7, 9, 14, 17, 4, 39, *shake_functions(24, 39))
-shake_192f: Parameter = Parameter(24, 66, 22, 3, 8, 33, 4, 42, *shake_functions(24, 42))
-shake_256s: Parameter = Parameter(32, 64, 8, 8, 14, 22, 4, 47, *shake_functions(32, 47))
-shake_256f: Parameter = Parameter(32, 68, 17, 4, 9, 35, 4, 49, *shake_functions(32, 49))
+shake_128s: Parameter = Parameter(26, 16, 63, 7, 9, 12, 14, 4, 30, *shake_functions(16, 30))
+shake_128f: Parameter = Parameter(27, 16, 66, 22, 3, 6, 33, 4, 34, *shake_functions(16, 35))
+shake_192s: Parameter = Parameter(28, 24, 63, 7, 9, 14, 17, 4, 39, *shake_functions(24, 39))
+shake_192f: Parameter = Parameter(29, 24, 66, 22, 3, 8, 33, 4, 42, *shake_functions(24, 42))
+shake_256s: Parameter = Parameter(30, 32, 64, 8, 8, 14, 22, 4, 47, *shake_functions(32, 47))
+shake_256f: Parameter = Parameter(31, 32, 68, 17, 4, 9, 35, 4, 49, *shake_functions(32, 49))
 
 
 # Declares the sha256 parameters defined in fIPS205
@@ -127,9 +132,9 @@ def sha2_35_functions(n: int, m: int) -> tuple[Callable[..., bytes], ...]:
     return h_msg, prf, prf_msg, f, h, t_l
 
 
-sha2_128s: Parameter = Parameter(16, 63, 7, 9, 12, 14, 4, 30, *sha2_1_functions(16, 30))
-sha2_128f: Parameter = Parameter(16, 66, 22, 3, 6, 33, 4, 34, *sha2_1_functions(16, 35))
-sha2_192s: Parameter = Parameter(24, 63, 7, 9, 14, 17, 4, 39, *sha2_35_functions(24, 39))
-sha2_192f: Parameter = Parameter(24, 66, 22, 3, 8, 33, 4, 42, *sha2_35_functions(24, 42))
-sha2_256s: Parameter = Parameter(32, 64, 8, 8, 14, 22, 4, 47, *sha2_35_functions(32, 47))
-sha2_256f: Parameter = Parameter(32, 68, 17, 4, 9, 35, 4, 49, *sha2_35_functions(32, 49))
+sha2_128s: Parameter = Parameter(20, 16, 63, 7, 9, 12, 14, 4, 30, *sha2_1_functions(16, 30))
+sha2_128f: Parameter = Parameter(21, 16, 66, 22, 3, 6, 33, 4, 34, *sha2_1_functions(16, 35))
+sha2_192s: Parameter = Parameter(22, 24, 63, 7, 9, 14, 17, 4, 39, *sha2_35_functions(24, 39))
+sha2_192f: Parameter = Parameter(23, 24, 66, 22, 3, 8, 33, 4, 42, *sha2_35_functions(24, 42))
+sha2_256s: Parameter = Parameter(24, 32, 64, 8, 8, 14, 22, 4, 47, *sha2_35_functions(32, 47))
+sha2_256f: Parameter = Parameter(25, 32, 68, 17, 4, 9, 35, 4, 49, *sha2_35_functions(32, 49))
