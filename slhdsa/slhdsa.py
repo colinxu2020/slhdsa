@@ -1,8 +1,11 @@
 from dataclasses import dataclass
+from base64 import b64decode, b64encode
 
 import slhdsa.lowlevel.slhdsa as lowlevel
+import slhdsa.lowlevel.parameters
 from slhdsa.lowlevel.parameters import Parameter
 import slhdsa.exception as exc
+import slhdsa.asn
 
 
 @dataclass
@@ -51,6 +54,65 @@ class SecretKey:
 
     def __str__(self) -> str:
         return f'<SLHDSA Secret Key: {self.digest().hex()}>'
+    
+    @classmethod
+    def from_pkcs(cls, filename: str) -> "SecretKey":
+        with open(filename, 'r') as fp:
+            privkey = [i[:-1] for i in fp]
+        while privkey[-1] == '':
+            del privkey[-1]
+        if privkey[0] != '-----BEGIN PRIVATE KEY-----' or privkey[-1] != '-----END PRIVATE KEY-----':
+            raise ValueError("Invalid PKCS Key")
+        rt = slhdsa.asn.RecursiveParser.parse(b64decode((''.join(privkey[1:-1])).encode()))
+        if rt.children[0].value != 0:
+            raise ValueError("Invalid PKCS Key")
+        oid_node, digest = rt.children[1], rt.children[2].value
+        oid = oid_node.children[0].value
+        if oid[:8] != (2, 16, 840, 1, 101, 3, 4, 3) or oid[8] < 20 or oid[8] > 31:
+            raise ValueError("Non-SLHDSA Key Found")
+        if oid[8] == 20:
+            algo = slhdsa.lowlevel.parameters.sha2_128s
+        if oid[8] == 21:
+            algo = slhdsa.lowlevel.parameters.sha2_128f
+        if oid[8] == 22:
+            algo = slhdsa.lowlevel.parameters.sha2_192s
+        if oid[8] == 23:
+            algo = slhdsa.lowlevel.parameters.sha2_192f
+        if oid[8] == 24:
+            algo = slhdsa.lowlevel.parameters.sha2_256s
+        if oid[8] == 25:
+            algo = slhdsa.lowlevel.parameters.sha2_256f
+        if oid[8] == 26:
+            algo = slhdsa.lowlevel.parameters.shake_128s
+        if oid[8] == 27:
+            algo = slhdsa.lowlevel.parameters.shake_128f
+        if oid[8] == 26:
+            algo = slhdsa.lowlevel.parameters.shake_128s
+        if oid[8] == 27:
+            algo = slhdsa.lowlevel.parameters.shake_128f
+        if oid[8] == 28:
+            algo = slhdsa.lowlevel.parameters.shake_192s
+        if oid[8] == 29:
+            algo = slhdsa.lowlevel.parameters.shake_192f
+        if oid[8] == 30:
+            algo = slhdsa.lowlevel.parameters.shake_256s
+        if oid[8] == 31:
+            algo = slhdsa.lowlevel.parameters.shake_256f
+        return cls.from_digest(digest, algo)
+        
+    def to_pkcs(self, filename: str) -> None:
+        oid = self.par.objectid
+        oid_node = slhdsa.asn.Sequence([slhdsa.asn.ObjectId(oid)])
+        digest = slhdsa.asn.OctetString(self.digest())
+        version = slhdsa.asn.Integer(0, 1)
+        rt = slhdsa.asn.Sequence([version, oid_node, digest])
+        crt = b64encode(slhdsa.asn.RecursiveEncoder.dump(rt)).decode()
+        with open(filename, 'w') as fp:
+            fp.write('-----BEGIN PRIVATE KEY-----\n')
+            for i in range((len(crt) + 63) // 64):
+                fp.write(crt[i*64:(i+1)*64])
+                fp.write('\n')
+            fp.write('-----END PRIVATE KEY-----\n')
 
 
 @dataclass
