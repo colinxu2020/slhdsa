@@ -16,7 +16,7 @@ class Integer(Node):
 @dataclass
 class ObjectId(Node):
     typ: ClassVar[int] = 0x06
-    value: tuple[int]
+    value: tuple[int, ...]
 
 @dataclass
 class OctetString(Node):
@@ -26,5 +26,5 @@ class OctetString(Node):
 @dataclass
 class Sequence(Node):
     typ: ClassVar[int] = 0x30
-    children: list[Node]
+    children: list[Node, ...]
     

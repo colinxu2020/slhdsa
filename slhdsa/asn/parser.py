@@ -9,7 +9,7 @@ class RecursiveParser:
     @classmethod
     def _parse(cls, bin: bytes) -> tuple[Node, int]:
         if bin[0] == 0x02:
-            return Integer(int.from_bytes(bin[2:2+bin[1]]), bin[1]), 2+bin[1]
+            return Integer(int.from_bytes(bin[2:2+bin[1]], byteorder = 'big'), bin[1]), 2+bin[1]
         if bin[0] == 0x06:
             payload = bin[2:2+bin[1]]
             data = [payload[0]//40, payload[0]%40]
