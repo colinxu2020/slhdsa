@@ -5,7 +5,7 @@ class RecursiveEncoder:
     @classmethod
     def dump(cls, root: Node) -> bytes:
         if isinstance(root, Integer):
-            return root.typ.to_bytes(1, "big") + root.length.to_bytes(1, "big") + root.value.to_bytes(root.length)
+            return root.typ.to_bytes(1, "big") + root.length.to_bytes(1, "big") + root.value.to_bytes(root.length, "big")
         if isinstance(root, OctetString):
             return root.typ.to_bytes(1, "big") + len(root.value).to_bytes(1, "big") + root.value
         if isinstance(root, Sequence):

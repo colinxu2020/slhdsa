@@ -26,7 +26,7 @@ class Parameter:
     Tl: Callable[[bytes, Address, bytes], bytes]
     
     @property
-    def objectid(self):
+    def objectid(self) -> tuple:
         return (2, 16, 840, 1, 101, 3, 4, 3, self.oid_no)
 
 
