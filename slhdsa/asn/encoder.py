@@ -14,10 +14,10 @@ class RecursiveEncoder:
                 result += cls.dump(i)
             result = root.typ.to_bytes(1, "big") + len(result).to_bytes(1, "big") + result
             return result
-        if isinstance(root, ObjectIdentifier):
+        if isinstance(root, ObjectId):
             result = (root.value[0] * 40 + root.value[1]).to_bytes(1, "big")
             for i in root.value[2:]:
-                     if i < 128:
+                 if i < 128:
                      result += i.to_bytes(1, "big")
                  else:
                      tmp = bytearray()
@@ -25,8 +25,8 @@ class RecursiveEncoder:
                          tmp.append(i&0x7F)
                          i>>=7
                      tmp.reverse()
-                     for i in range(len(tmp) - 1):
-                         tmp[i] |= 0x80
+                     for j in range(len(tmp) - 1):
+                         tmp[j] = int(tmp[j]) | 0x80
                      result += bytes(tmp)
             return root.typ.to_bytes(1, "big") + len(result).to_bytes(1, "big") + result
         raise TypeError("Unknown Type")
