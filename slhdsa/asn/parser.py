@@ -9,7 +9,7 @@ class RecursiveParser:
     @classmethod
     def _parse(cls, bin: bytes) -> tuple[Node, int]:
         if bin[0] == 0x02:
-            return Integer(int.from_bytes(bin[2:2+bin[1]])), 2+bin[1]
+            return Integer(int.from_bytes(bin[2:2+bin[1]]), bin[1]), 2+bin[1]
         if bin[0] == 0x06:
             payload = bin[2:2+bin[1]]
             data = [payload[0]//40, payload[0]%40]
@@ -36,6 +36,6 @@ class RecursiveParser:
                 tmp = cls._parse(bin[offset:])
                 result.children.append(tmp[0])
                 offset += tmp[1]
-                print(offset)
             return result, 2 + bin[1]
         raise ValueError("Unknown ASN.1 Type")
+        

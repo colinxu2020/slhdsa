@@ -11,6 +11,7 @@ class Node(ABC):
 class Integer(Node):
     typ: ClassVar[int] = 0x02
     value: int
+    length: int
     
 @dataclass
 class ObjectId(Node):
