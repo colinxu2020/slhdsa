@@ -8,6 +8,16 @@ import slhdsa.exception as exc
 import slhdsa.asn
 
 
+class AlgorithmIdentifier(slhdsa.asn.Schema):
+    oid: slhdsa.asn.ObjectIdentifier
+
+
+class PrivateKeyInfo(slhdsa.asn.Schema):
+    version: slhdsa.asn.Integer
+    algorithm: AlgorithmIdentifier
+    private_key: slhdsa.asn.OctetString
+
+
 @dataclass
 class PublicKey:
     key: tuple[bytes, bytes]
@@ -63,11 +73,11 @@ class SecretKey:
             del privkey[-1]
         if privkey[0] != '-----BEGIN PRIVATE KEY-----' or privkey[-1] != '-----END PRIVATE KEY-----':
             raise ValueError("Invalid PKCS Key")
-        rt = slhdsa.asn.RecursiveParser.parse(b64decode((''.join(privkey[1:-1])).encode()))
-        if rt.children[0].value != 0:
+        structure = PrivateKeyInfo.loads(b64decode((''.join(privkey[1:-1])).encode()))
+        if structure.version != 0:
             raise ValueError("Invalid PKCS Key")
-        oid_node, digest = rt.children[1], rt.children[2].value
-        oid = oid_node.children[0].value
+        oid = structure.algorithm.oid
+        digest = bytes(structure.private_key)
         if oid[:8] != (2, 16, 840, 1, 101, 3, 4, 3) or oid[8] < 20 or oid[8] > 31:
             raise ValueError("Non-SLHDSA Key Found")
         if oid[8] == 20:
@@ -101,12 +111,12 @@ class SecretKey:
         return cls.from_digest(digest, algo)
         
     def to_pkcs(self, filename: str) -> None:
-        oid = self.par.objectid
-        oid_node = slhdsa.asn.Sequence([slhdsa.asn.ObjectId(oid)])
-        digest = slhdsa.asn.OctetString(self.digest())
-        version = slhdsa.asn.Integer(0, 1)
-        rt = slhdsa.asn.Sequence([version, oid_node, digest])
-        crt = b64encode(slhdsa.asn.RecursiveEncoder.dump(rt)).decode()
+        structure = PrivateKeyInfo(
+            version=0,
+            algorithm=AlgorithmIdentifier(oid=self.par.objectid),
+            private_key=slhdsa.asn.OctetString(self.digest()),
+        )
+        crt = b64encode(structure.dumps()).decode()
         with open(filename, 'w') as fp:
             fp.write('-----BEGIN PRIVATE KEY-----\n')
             for i in range((len(crt) + 63) // 64):
