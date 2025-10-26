@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Annotated, Any, Iterable, Tuple, get_args, get_origin, get_type_hints
+from typing import Annotated, Any, ClassVar, TypeVar, get_args, get_origin, get_type_hints
 
 __all__ = ["Schema", "Sequence", "Integer", "OctetString", "ObjectIdentifier"]
 
@@ -20,7 +20,7 @@ class Sequence(metaclass=_SequenceMeta):
 class OctetString(bytes):
     """Runtime representation of ASN.1 OCTET STRING that behaves like bytes."""
 
-    _asn_descriptor: "_OctetStringDescriptor"
+    _asn_descriptor: ClassVar["_OctetStringDescriptor"]
 
     def __new__(cls, value: bytes | bytearray | memoryview) -> "OctetString":
         return bytes.__new__(cls, bytes(value))
@@ -426,12 +426,17 @@ def _unpack_annotated(annotation: Any) -> tuple[Any, tuple[Any, ...]]:
 
 
 class _SchemaMeta(type):
-    def __new__(mcls, name: str, bases: tuple[type, ...], namespace: dict[str, Any]):
+    _asn_fields: ClassVar[tuple[_FieldSpec, ...]]
+    _asn_descriptor: ClassVar[_SequenceDescriptor]
+    __slots__: ClassVar[tuple[str, ...]]
+
+    def __new__(mcls, name: str, bases: tuple[type, ...], namespace: dict[str, Any]) -> type:
         cls = super().__new__(mcls, name, bases, namespace)
         if name == "Schema":
-            cls._asn_fields = ()
-            cls._asn_descriptor = _SequenceDescriptor((), tuple)
-            cls.__slots__ = ()
+            base_fields: tuple[_FieldSpec, ...] = ()
+            setattr(cls, "_asn_fields", base_fields)
+            setattr(cls, "_asn_descriptor", _SequenceDescriptor((), tuple))
+            setattr(cls, "__slots__", ())
             return cls
         resolved_hints = get_type_hints(cls, include_extras=True)
         own_annotations = namespace.get("__annotations__", {})
@@ -456,16 +461,21 @@ class _SchemaMeta(type):
             else:
                 field_specs.append(spec)
                 seen.add(name_key)
-        cls._asn_fields = tuple(field_specs)
-        cls._asn_descriptor = _SequenceDescriptor(tuple(spec.descriptor for spec in cls._asn_fields), tuple)
-        cls.__slots__ = tuple(spec.name for spec in cls._asn_fields)
+        field_tuple = tuple(field_specs)
+        descriptor = _SequenceDescriptor(tuple(spec.descriptor for spec in field_tuple), tuple)
+        setattr(cls, "_asn_fields", field_tuple)
+        setattr(cls, "_asn_descriptor", descriptor)
+        setattr(cls, "__slots__", tuple(spec.name for spec in field_tuple))
         return cls
+
+
+SchemaT = TypeVar("SchemaT", bound="Schema")
 
 
 class Schema(metaclass=_SchemaMeta):
     __slots__ = ()
-    _asn_fields: tuple[_FieldSpec, ...]
-    _asn_descriptor: _SequenceDescriptor
+    _asn_fields: ClassVar[tuple[_FieldSpec, ...]]
+    _asn_descriptor: ClassVar[_SequenceDescriptor]
 
     def __init__(self, *values: Any, **named_values: Any) -> None:
         field_count = len(self._asn_fields)
@@ -490,14 +500,14 @@ class Schema(metaclass=_SchemaMeta):
         return self._asn_descriptor.encode(values)
 
     @classmethod
-    def loads(cls, data: bytes) -> "Schema":
+    def loads(cls: type[SchemaT], data: bytes) -> SchemaT:
         obj, offset = cls._decode_stream(data, 0)
         if offset != len(data):
             raise ValueError("Trailing bytes after ASN.1 structure")
         return obj
 
     @classmethod
-    def _decode_stream(cls, data: bytes, offset: int) -> tuple["Schema", int]:
+    def _decode_stream(cls: type[SchemaT], data: bytes, offset: int) -> tuple[SchemaT, int]:
         items, new_offset = cls._asn_descriptor.decode(data, offset)
         instance = cls.__new__(cls)
         for spec, value in zip(cls._asn_fields, items):
