@@ -54,7 +54,7 @@ def shake_functions(n: int, m: int) -> tuple[Callable[..., bytes], ...]:
 
 
 shake_128s: Parameter = Parameter(26, 16, 63, 7, 9, 12, 14, 4, 30, *shake_functions(16, 30))
-shake_128f: Parameter = Parameter(27, 16, 66, 22, 3, 6, 33, 4, 34, *shake_functions(16, 35))
+shake_128f: Parameter = Parameter(27, 16, 66, 22, 3, 6, 33, 4, 34, *shake_functions(16, 34))
 shake_192s: Parameter = Parameter(28, 24, 63, 7, 9, 14, 17, 4, 39, *shake_functions(24, 39))
 shake_192f: Parameter = Parameter(29, 24, 66, 22, 3, 8, 33, 4, 42, *shake_functions(24, 42))
 shake_256s: Parameter = Parameter(30, 32, 64, 8, 8, 14, 22, 4, 47, *shake_functions(32, 47))
@@ -133,7 +133,7 @@ def sha2_35_functions(n: int, m: int) -> tuple[Callable[..., bytes], ...]:
 
 
 sha2_128s: Parameter = Parameter(20, 16, 63, 7, 9, 12, 14, 4, 30, *sha2_1_functions(16, 30))
-sha2_128f: Parameter = Parameter(21, 16, 66, 22, 3, 6, 33, 4, 34, *sha2_1_functions(16, 35))
+sha2_128f: Parameter = Parameter(21, 16, 66, 22, 3, 6, 33, 4, 34, *sha2_1_functions(16, 34))
 sha2_192s: Parameter = Parameter(22, 24, 63, 7, 9, 14, 17, 4, 39, *sha2_35_functions(24, 39))
 sha2_192f: Parameter = Parameter(23, 24, 66, 22, 3, 8, 33, 4, 42, *sha2_35_functions(24, 42))
 sha2_256s: Parameter = Parameter(24, 32, 64, 8, 8, 14, 22, 4, 47, *sha2_35_functions(32, 47))
