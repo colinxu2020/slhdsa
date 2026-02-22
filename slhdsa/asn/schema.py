@@ -444,7 +444,8 @@ class _SchemaMeta(type):
     __slots__: ClassVar[tuple[str, ...]]
 
     def __new__(mcls, name: str, bases: tuple[type, ...], namespace: dict[str, Any]) -> type:
-        cls = super().__new__(mcls, name, bases, namespace)
+        _new: Any = super().__new__  # Trick for mypyc
+        cls = _new(mcls, name, bases, namespace)
         if name == "Schema":
             base_fields: tuple[_FieldSpec, ...] = ()
             setattr(cls, "_asn_fields", base_fields)
