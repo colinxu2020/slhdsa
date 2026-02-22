@@ -1,11 +1,21 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Annotated, Any, ClassVar, TypeVar, get_args, get_origin, get_type_hints
+from typing import Annotated, Any, ClassVar, TypeVar, get_args, get_origin, get_type_hints, Callable
+
+try:
+    from mypy_extensions import mypyc_attr
+except ImportError:
+    T = TypeVar("T")
+    def mypyc_attr(*attrs: str, **kwattrs: object) -> Callable[[T], T]:
+        def wrapper(obj: T) -> T:
+            return obj
+        return wrapper
 
 __all__ = ["Schema", "Sequence", "Integer", "OctetString", "ObjectIdentifier"]
 
 
+@mypyc_attr(native_class=False)
 class _SequenceMeta(type):
     def __getitem__(cls, parameters: Any) -> Any:
         if not isinstance(parameters, tuple):
@@ -13,10 +23,12 @@ class _SequenceMeta(type):
         return Annotated[cls, parameters]
 
 
+@mypyc_attr(native_class=False)
 class Sequence(metaclass=_SequenceMeta):
     """Marker used inside typing.Annotated metadata to describe ASN.1 SEQUENCE nodes."""
 
 
+@mypyc_attr(native_class=False)
 class OctetString(bytes):
     """Runtime representation of ASN.1 OCTET STRING that behaves like bytes."""
 
@@ -425,6 +437,7 @@ def _unpack_annotated(annotation: Any) -> tuple[Any, tuple[Any, ...]]:
     return annotation, ()
 
 
+@mypyc_attr(native_class=False)
 class _SchemaMeta(type):
     _asn_fields: ClassVar[tuple[_FieldSpec, ...]]
     _asn_descriptor: ClassVar[_SequenceDescriptor]
@@ -472,6 +485,7 @@ class _SchemaMeta(type):
 SchemaT = TypeVar("SchemaT", bound="Schema")
 
 
+@mypyc_attr(native_class=False)
 class Schema(metaclass=_SchemaMeta):
     __slots__ = ()
     _asn_fields: ClassVar[tuple[_FieldSpec, ...]]

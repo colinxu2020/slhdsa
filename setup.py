@@ -22,7 +22,7 @@ if os.getenv('SLHDSA_BUILD_OPTIMIZED', '0') == '1' or os.getenv('CIBUILDWHEEL', 
     print('Building Optimized Library')
     
     for pth in Path('slhdsa').glob('**/*.py'):
-        if pth.name != '__init__.py' and pth.as_posix() != 'slhdsa/asn/schema.py':
+        if pth.name != '__init__.py':
             mypyc_targets.append(pth.as_posix().replace('/', os.sep))
 
     from mypyc.build import mypycify
