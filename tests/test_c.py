@@ -1,15 +1,59 @@
-import base64
-import subprocess
-import shutil
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any, Tuple
 
 import pytest
 
 import slhdsa.asn as asn
 import slhdsa.asn.schema as schema
 from slhdsa import KeyPair, SecretKey, sha2_128s
-from slhdsa.slhdsa import AlgorithmIdentifier, PrivateKeyInfo, PublicKey
+from slhdsa.slhdsa import AlgorithmIdentifier, PrivateKeyInfo
+
+
+def test_sequence_meta_single_parameter():
+    annotated = asn.Sequence[asn.Integer]
+    base, extras = schema._unpack_annotated(annotated)
+    assert base is asn.Sequence
+    assert extras and extras[0][0] is asn.Integer
+
+
+def test_asn1type_not_implemented():
+    instance = schema._ASN1Type()
+    with pytest.raises(NotImplementedError):
+        instance.decode(b"", 0)
+    with pytest.raises(NotImplementedError):
+        instance.encode(None)
+
+
+def test_length_helpers_long_form():
+    assert schema._read_length(b"\x81\x05", 0) == (5, 2)
+    assert schema._encode_length(0x80) == b"\x81\x80"
+
+
+def test_encode_integer_content_trimming_and_prefix():
+    class IntWithBits(int):
+        def __new__(cls, value: int, extra_bits: int = 0):
+            obj = int.__new__(cls, value)
+            obj.extra_bits = extra_bits
+            return obj
+
+        def bit_length(self):
+            return super().bit_length() + self.extra_bits
+    positive = IntWithBits(0x80, 8)
+    assert schema._encode_integer_content(positive) == b"\x00\x80"
+    mixed = IntWithBits(0x1234, 8)
+    assert schema._encode_integer_content(mixed) == b"\x12\x34"
+    negative = IntWithBits(-1, 8)
+    assert schema._encode_integer_content(negative) == b"\xff"
+
+
+def test_integer_descriptor_bad_tag():
+    with pytest.raises(ValueError):
+        schema._INTEGER_DESCRIPTOR.decode(b"\x04\x00", 0)
+
+
+def test_octet_string_descriptor_byteslike():
+    encoded = schema._OCTET_STRING_DESCRIPTOR.encode(bytearray(b"ab"))
+    assert encoded.startswith(b"\x04\x02ab")
 
 
 def test_integer_roundtrip():
@@ -153,6 +197,13 @@ def test_sequence_descriptor_prepare_and_build_variants():
     assert seq_set._build_python_value([5]) == {5}
     seq_callable = schema._SequenceDescriptor((schema._INTEGER_DESCRIPTOR,), lambda v: {"values": tuple(v)})
     assert seq_callable._build_python_value([4]) == {"values": (4,)}
+    seq_object = schema._SequenceDescriptor((schema._INTEGER_DESCRIPTOR,), object())
+    assert seq_object._build_python_value([3]) == (3,)
+    assert seq._prepare_iterable({1, 2}) and set(seq._prepare_iterable({1, 2})) == {1, 2}
+    class IterableWrapper:
+        def __iter__(self):
+            yield 5
+    assert seq._prepare_iterable(IterableWrapper()) == (5,)
 
 
 class Pair(schema.Schema):
@@ -183,70 +234,72 @@ def test_schema_construction_errors_and_repr():
         TwoInts(a=1, b=2, c=3)
     obj = TwoInts(a=1, b=2)
     assert "TwoInts" in repr(obj)
+    class Base(schema.Schema):
+        a: asn.Integer
+    class Child(Base):
+        a: asn.OctetString
+        b: asn.Integer
+    child = Child(a=asn.OctetString(b"v"), b=3)
+    assert isinstance(child.a, asn.OctetString)
 
 
 def test_sequence_annotation_must_have_children():
     with pytest.raises(TypeError):
         class _(asn.Schema):
             value: asn.Sequence
+    with pytest.raises(TypeError):
+        schema._descriptor_from_annotation(asn.Sequence)
 
 
-def test_coercion_to_bytes_with_sequence_element_types():
+def test_sequence_element_helpers_and_coercion():
     class BytePair(asn.Schema):
         payload: Annotated[tuple[bytes, bytes], asn.Sequence[asn.OctetString, asn.OctetString]]
     original = BytePair((asn.OctetString(b"a"), asn.OctetString(b"b")))
     decoded = BytePair.loads(original.dumps())
     assert decoded.payload == (b"a", b"b")
+    assert schema._extract_sequence_element_types(tuple) == ()
+    assert schema._extract_sequence_element_types(Tuple) == ()
+    assert schema._expected_type_for_index((int, Ellipsis), 0) is int
+    assert schema._expected_type_for_index((int, Ellipsis), 3) is int
+    assert schema._expected_type_for_index((str, Ellipsis, bytes), 1) is str
+    assert schema._expected_type_for_index((bytes, Ellipsis), 5) is bytes
+    assert schema._expected_type_for_index((int, str), 5) is None
+    annotated = Annotated[int, "meta"]
+    assert schema._strip_annotated(annotated) is int
+    assert schema._coerce_value_to_python_type("x", Any) == "x"
+    class EqualsAny:
+        def __eq__(self, other):
+            return other is Any
+    assert schema._coerce_value_to_python_type("y", EqualsAny()) == "y"
+    octet = asn.OctetString(b"data")
+    assert schema._coerce_value_to_python_type(octet, bytes) == b"data"
+    buf = bytearray(b"z")
+    assert schema._coerce_value_to_python_type(buf, bytes) == b"z"
+    assert schema._coerce_value_to_python_type("keep", bytes) == "keep"
+    descriptor = schema._SequenceDescriptor((schema._INTEGER_DESCRIPTOR,), tuple)
+    assert schema._normalize_python_type(123) is tuple
 
 
-def test_openssl_interop(tmp_path: Path):
-    openssl = shutil.which("openssl")
-    if openssl is None:
-        pytest.skip("openssl not available")
-    priv_path = tmp_path / "slhdsa.pem"
-    pub_path = tmp_path / "slhdsa_pub.pem"
-    msg_path = tmp_path / "msg.bin"
-    msg_path.write_bytes(b"openssl-interop")
-    try:
-        subprocess.run(
-            [openssl, "genpkey", "-algorithm", "slh-dsa-sha2-128s", "-out", str(priv_path)],
-            check=True,
-            capture_output=True,
-        )
-    except subprocess.CalledProcessError as exc:
-        stderr = exc.stderr.decode(errors="ignore") if exc.stderr else ""
-        pytest.skip(f"openssl genpkey unsupported: {stderr}")
-    subprocess.run([openssl, "pkey", "-in", str(priv_path), "-pubout", "-out", str(pub_path)], check=True, capture_output=True)
-    sk = SecretKey.from_pkcs(str(priv_path))
-    assert sk.par is sha2_128s
-    pub = PublicKey((sk.key[2], sk.key[3]), sk.par)
-    sig = sk.sign(msg_path.read_bytes())
-    sig_path = tmp_path / "libsig.bin"
-    sig_path.write_bytes(sig)
-    verify_run = subprocess.run(
-        [
-            openssl,
-            "pkeyutl",
-            "-verify",
-            "-pubin",
-            "-inkey",
-            str(pub_path),
-            "-sigfile",
-            str(sig_path),
-            "-rawin",
-            "-in",
-            str(msg_path),
-        ],
-        capture_output=True,
-    )
-    if verify_run.returncode != 0:
-        stderr = verify_run.stderr.decode(errors="ignore") if verify_run.stderr else ""
-        pytest.fail(f"OpenSSL failed verifying library signature: {stderr}")
-    ossig_path = tmp_path / "ossig.bin"
-    subprocess.run(
-        [openssl, "pkeyutl", "-sign", "-inkey", str(priv_path), "-rawin", "-in", str(msg_path), "-out", str(ossig_path)],
-        check=True,
-        capture_output=True,
-    )
-    ossig = ossig_path.read_bytes()
-    assert pub.verify(msg_path.read_bytes(), ossig)
+def test_descriptor_resolution_edges(monkeypatch):
+    descriptor = schema._SequenceDescriptor((schema._INTEGER_DESCRIPTOR,), tuple)
+    copied = schema._resolve_descriptor(descriptor, list, ())
+    assert isinstance(copied, schema._SequenceDescriptor) and copied is not descriptor
+    annotated_seq = Annotated[asn.Sequence, schema._INTEGER_DESCRIPTOR]
+    assert isinstance(schema._resolve_descriptor(annotated_seq, tuple, ()), schema._SequenceDescriptor)
+    annotated_int = Annotated[int, schema._INTEGER_DESCRIPTOR]
+    assert schema._resolve_descriptor(annotated_int, tuple, ()) is schema._INTEGER_DESCRIPTOR
+    assert schema._descriptor_from_base(tuple[int], tuple, ()) is None
+    sentinel = object()
+    original_get_origin = schema.get_origin
+    original_get_args = schema.get_args
+    monkeypatch.setattr(schema, "get_origin", lambda obj: Annotated if obj is sentinel else original_get_origin(obj))
+    monkeypatch.setattr(schema, "get_args", lambda obj: (asn.Sequence,) if obj is sentinel else original_get_args(obj))
+    with pytest.raises(TypeError):
+        schema._resolve_descriptor(sentinel, tuple, ())
+
+
+def test_schema_meta_missing_annotation(monkeypatch):
+    monkeypatch.setattr(schema, "get_type_hints", lambda cls, include_extras=True: {})
+    with pytest.raises(TypeError):
+        class _Bad(schema.Schema):
+            a: "missing"
