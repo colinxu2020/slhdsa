@@ -1,6 +1,6 @@
 [project]
 name = "SLH-DSA"
-version = "0.1.4"
+version = "0.2.1"
 description = "Pure Python implementation of the SLH-DSA algorithm (based on FIPS 205)."
 authors = [
     {name = "Colinxu2020", email = "colinxu2020@gmail.com"},
