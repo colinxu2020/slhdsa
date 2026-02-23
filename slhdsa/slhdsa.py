@@ -185,6 +185,14 @@ class SecretKey:
                 fp.write('\n')
             fp.write('-----END PRIVATE KEY-----\n')
 
+    @property
+    def pubkey(self) -> PublicKey:
+        return PublicKey((self.key[2], self.key[3]), self.par)
+
+    @property
+    def keypair(self) -> "KeyPair":
+        return KeyPair(self.pubkey, self)
+
 
 @dataclass
 class KeyPair:

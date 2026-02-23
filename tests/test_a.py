@@ -135,3 +135,10 @@ def test8(tmp_path: Path) -> None:
         pub.to_pkcs(pub_path.as_posix())
         assert PublicKey.from_pkcs(pub_path.as_posix()) == pub
     _for_all(judge)
+
+def test9() -> None:
+    def judge(para):
+        kp = KeyPair.gen(para)
+        assert kp.sec.pubkey == kp.pub
+        assert kp == kp.sec.keypair
+    _for_all(judge)
