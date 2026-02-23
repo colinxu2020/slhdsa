@@ -16,7 +16,7 @@ class FORS:
         return self.parameter.PRF(pk_seed, sk_seed, sk_address)
 
     def node(self, sk_seed: bytes, cur: int, dep: int, pk_seed: bytes, address: FORSTreeAddress) -> bytes:
-        if dep > self.parameter.a or cur >= self.parameter.k * 2 ** (self.parameter.a - dep):
+        if dep > self.parameter.a or cur >= self.parameter.k * (1 << (self.parameter.a - dep)):
             return b""
         if dep == 0:
             sk = self.generate_secretkey(sk_seed, pk_seed, address, cur)
@@ -35,11 +35,11 @@ class FORS:
         fors_sign = b""
         indices = base2b(md, self.parameter.a, self.parameter.k)
         for i in range(self.parameter.k):
-            fors_sign += self.generate_secretkey(sk_seed, pk_seed, address, i * 2 ** self.parameter.a + indices[i])
+            fors_sign += self.generate_secretkey(sk_seed, pk_seed, address, i * (1 << self.parameter.a) + indices[i])
             auth = b""
             for j in range(self.parameter.a):
-                s = (indices[i] // (2 ** j)) ^ 1
-                auth += self.node(sk_seed, i * 2 ** (self.parameter.a - j) + s, j, pk_seed, address)
+                s = (indices[i] // (1 << j)) ^ 1
+                auth += self.node(sk_seed, i * (1 << (self.parameter.a - j)) + s, j, pk_seed, address)
             fors_sign += auth
         return fors_sign
 
@@ -50,14 +50,14 @@ class FORS:
             sk = fors_sign[
                  i * (self.parameter.a + 1) * self.parameter.n:(i * (self.parameter.a + 1) + 1) * self.parameter.n]
             address.height = 0
-            address.index = i * 2 ** self.parameter.a + indices[i]
+            address.index = i * (1 << self.parameter.a) + indices[i]
             node = self.parameter.F(pk_seed, address, sk)
             auth = fors_sign[(i * (self.parameter.a + 1) + 1) * self.parameter.n:(i + 1) * (
                         self.parameter.a + 1) * self.parameter.n]
 
             for j in range(self.parameter.a):
                 address.height = j + 1
-                if (indices[i] // (2 ** j)) % 2 == 0:
+                if (indices[i] // (1 << j)) % 2 == 0:
                     address.index //= 2
                     node = self.parameter.H(pk_seed, address, node + auth[j * self.parameter.n:(j + 1) * self.parameter.n])
                 else:

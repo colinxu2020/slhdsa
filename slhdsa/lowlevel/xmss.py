@@ -15,7 +15,7 @@ class XMSS:
         self.parameter = parameter
 
     def node(self, sk_seed: bytes, cur: int, dep: int, pk_seed: bytes, address: Address) -> bytes:
-        if dep > self.parameter.h_m or cur >= 2 ** (self.parameter.h_m - dep):
+        if dep > self.parameter.h_m or cur >= (1 << (self.parameter.h_m - dep)):
             return b""
         if dep == 0:
             address = address.with_type(WOTSHashAddress)
@@ -33,7 +33,7 @@ class XMSS:
     def sign(self, msg: bytes, sk_seed: bytes, idx: int, pk_seed: bytes, address: Address) -> bytes:
         auth = b''
         for j in range(self.parameter.h_m):
-            k = (idx // (2 ** j)) ^ 1
+            k = (idx // (1 << j)) ^ 1
             auth += self.node(sk_seed, k, j, pk_seed, address)
 
         address = address.with_type(WOTSHashAddress)
@@ -53,7 +53,7 @@ class XMSS:
 
         for k in range(self.parameter.h_m):
             address.height = k + 1
-            if (idx // (2 ** k)) % 2 == 0:
+            if (idx // (1 << k)) % 2 == 0:
                 address.index //= 2
                 node = self.parameter.H(pk_seed, address, node + auth[k * self.parameter.n:(k + 1) * self.parameter.n])
             else:

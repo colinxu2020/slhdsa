@@ -17,7 +17,7 @@ class HyperTree:
         ht_sign = tmp_sign = tree.sign(msg, sk_seed, leaf_idx, pk_seed, address)
         root = tree.public_key_from_sign(leaf_idx, tmp_sign, msg, pk_seed, address)
         for j in range(1, self.parameter.d):
-            leaf_idx = tree_idx % (2 ** self.parameter.h_m)
+            leaf_idx = tree_idx % (1 << self.parameter.h_m)
             tree_idx >>= self.parameter.h_m
             address.layer = j
             address.tree = tree_idx
@@ -36,7 +36,7 @@ class HyperTree:
         node = tree.public_key_from_sign(leaf_idx, tmp_sign, msg, pk_seed, address)
 
         for j in range(1, self.parameter.d):
-            leaf_idx = tree_idx % (2 ** self.parameter.h_m)
+            leaf_idx = tree_idx % (1 << self.parameter.h_m)
             tree_idx >>= self.parameter.h_m
             address.layer = j
             address.tree = tree_idx

@@ -38,12 +38,12 @@ def sign(msg: bytes, secret_key: tuple[bytes, bytes, bytes, bytes], par: Paramet
     md = digest[:ceil_div(par.k * par.a, 8)]
     tree_idx = int.from_bytes(
         digest[ceil_div(par.k * par.a, 8):ceil_div(par.k * par.a, 8) + ceil_div(par.h - par.h // par.d, 8)], "big")
-    tree_idx %= 2 ** (par.h - par.h // par.d)
+    tree_idx %= (1 << (par.h - par.h // par.d))
     leaf_idx = int.from_bytes(digest[
                              ceil_div(par.k * par.a, 8) + ceil_div(par.h - par.h // par.d, 8):ceil_div(par.k * par.a,
                                                                                                        8) + ceil_div(
                                  par.h - par.h // par.d, 8) + ceil_div(par.h, 8 * par.d)], "big")
-    leaf_idx %= 2 ** (par.h // par.d)
+    leaf_idx %= (1 << (par.h // par.d))
     address.tree = tree_idx
     address.keypair = leaf_idx
     fors = FORS(par)
@@ -67,12 +67,12 @@ def verify(msg: bytes, sig: bytes, public_key: tuple[bytes, bytes], par: Paramet
     md = digest[:ceil_div(par.k * par.a, 8)]
     tree_id = int.from_bytes(
         digest[ceil_div(par.k * par.a, 8):ceil_div(par.k * par.a, 8) + ceil_div(par.h - par.h // par.d, 8)], "big")
-    tree_id %= 2 ** (par.h - par.h // par.d)
+    tree_id %= (1 << (par.h - par.h // par.d) )
     leaf_id = int.from_bytes(digest[
                              ceil_div(par.k * par.a, 8) + ceil_div(par.h - par.h // par.d, 8):ceil_div(par.k * par.a,
                                                                                                        8) + ceil_div(
                                  par.h - par.h // par.d, 8) + ceil_div(par.h, 8 * par.d)], "big")
-    leaf_id %= 2 ** (par.h // par.d)
+    leaf_id %= (1 << (par.h // par.d))
     address.tree = tree_id
     address.keypair = leaf_id
     fors_pk = FORS(par).publickey_from_sign(fors_sign, md, pk_seed, address)

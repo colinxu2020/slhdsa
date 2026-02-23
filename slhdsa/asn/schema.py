@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, ClassVar, Dict, Iterable, Tuple, Type, TypeVar, get_type_hints
+from typing import Any, ClassVar, Dict, Iterable, Tuple, Type, TypeVar, get_type_hints, cast
 
 __all__ = [
     "ASN1Error",
@@ -120,11 +120,11 @@ def _validate_integer_bytes(content: bytes) -> None:
             raise ASN1DecodeError("INTEGER has non-minimal leading 0xFF")
 
 
-class ObjectIdentifier(tuple):
-    def __new__(cls, value: Iterable[int]):
+class ObjectIdentifier(tuple[int, ...]):
+    def __new__(cls, value: Iterable[int]) -> "ObjectIdentifier":
         items = tuple(int(v) for v in value)
         _validate_oid(items)
-        return super().__new__(cls, items)
+        return cast("ObjectIdentifier", super().__new__(cls, items))
 
     def dumps(self) -> bytes:
         first, second = self[0], self[1]
@@ -200,8 +200,8 @@ def _decode_oid_arc(data: bytes, offset: int) -> tuple[int, int]:
 
 
 class OctetString(bytes):
-    def __new__(cls, value: bytes | bytearray | memoryview):
-        return super().__new__(cls, bytes(value))
+    def __new__(cls, value: bytes | bytearray | memoryview) -> "OctetString":
+        return cast("OctetString", super().__new__(cls, bytes(value)))
 
     def dumps(self) -> bytes:
         return _encode_tlv(_TAG_OCTET_STRING, bytes(self))
@@ -379,40 +379,35 @@ def _decode_value(data: bytes, offset: int, expected: Type[Any]) -> tuple[Any, i
             raise ASN1TagError("Expected INTEGER")
         end = start + length
         _ensure_boundary(data, end)
-        value = Integer.loads(data[offset:end])
-        return value, end
+        return Integer.loads(data[offset:end]), end
     if expected is ObjectIdentifier or issubclass(expected, ObjectIdentifier):
         tag, length, start = _read_tlv_header(data, offset)
         if tag != _TAG_OBJECT_ID:
             raise ASN1TagError("Expected OBJECT IDENTIFIER")
         end = start + length
         _ensure_boundary(data, end)
-        value = ObjectIdentifier.loads(data[offset:end])
-        return value, end
+        return ObjectIdentifier.loads(data[offset:end]), end
     if expected is OctetString or issubclass(expected, OctetString):
         tag, length, start = _read_tlv_header(data, offset)
         if tag != _TAG_OCTET_STRING:
             raise ASN1TagError("Expected OCTET STRING")
         end = start + length
         _ensure_boundary(data, end)
-        value = OctetString.loads(data[offset:end])
-        return value, end
+        return OctetString.loads(data[offset:end]), end
     if expected is BitString or issubclass(expected, BitString):
         tag, length, start = _read_tlv_header(data, offset)
         if tag != _TAG_BIT_STRING:
             raise ASN1TagError("Expected BIT STRING")
         end = start + length
         _ensure_boundary(data, end)
-        value = BitString.loads(data[offset:end])
-        return value, end
+        return BitString.loads(data[offset:end]), end
     if issubclass(expected, Schema):
         tag, length, start = _read_tlv_header(data, offset)
         if tag != _TAG_SEQUENCE:
             raise ASN1TagError(f"Expected SEQUENCE for {expected.__name__}")
         end = start + length
         _ensure_boundary(data, end)
-        value = expected.loads(data[offset:end])
-        return value, end
+        return expected.loads(data[offset:end]), end
     raise TypeError(f"Unsupported field type: {expected!r}")
 
 

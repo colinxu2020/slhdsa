@@ -14,7 +14,7 @@ class WOTSParameter:
     len: int
 
     def __init__(self, par: Parameter) -> None:
-        self.w = 2 ** par.lgw
+        self.w = 1 << par.lgw
         self.len1 = ceil_div(8 * par.n, par.lgw)
         self.len2 = int(log2(self.len1 * (self.w - 1))) // par.lgw + 1
         self.len = self.len1 + self.len2

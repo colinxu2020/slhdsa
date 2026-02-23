@@ -20,5 +20,5 @@ def base2b(data: bytes, b: int, out_len: int) -> list[int]:
             in_ += 1
             bits += 8
         bits -= b
-        result.append((total >> bits) % (2 ** b))
+        result.append((total >> bits) % (1 << b))
     return result
