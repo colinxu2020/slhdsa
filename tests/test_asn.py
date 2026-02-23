@@ -434,3 +434,41 @@ def test_coerce_unsupported_field_type() -> None:
 
     with pytest.raises(TypeError):
         BadAnnot(val=1)
+
+
+def test_integer_int_and_index_and_eq_branches() -> None:
+    i = Integer(7)
+    assert int(i) == 7
+    assert [1] * i == [1, 1, 1, 1, 1, 1, 1]  # uses __index__
+    assert i == 7
+    assert i != 8
+
+
+def test_oid_eq_tuple_branch() -> None:
+    oid = ObjectIdentifier((1, 2, 3))
+    assert oid == (1, 2, 3)
+
+
+def test_octet_string_eq_bytes_and_other() -> None:
+    s = OctetString(b"abc")
+    assert s == b"abc"
+    assert s != "abc"
+
+
+def test_integer_eq_integer_and_other_type() -> None:
+    i1 = Integer(3)
+    i2 = Integer(3)
+    assert i1 == i2  # hits Integer branch
+    assert (i1 == "3") is False  # hits fallback branch
+
+
+def test_oid_eq_other_type_false() -> None:
+    oid = ObjectIdentifier((1, 2, 3))
+    assert (oid == "1.2.3") is False
+
+
+def test_octet_string_eq_octetstring_branch() -> None:
+    a = OctetString(b"abc")
+    b = OctetString(b"abc")
+    assert a == b
+

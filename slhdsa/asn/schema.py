@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, ClassVar, Dict, Iterable, Tuple, Type, TypeVar, get_type_hints, cast
+from typing import Any, ClassVar, Dict, Iterable, Tuple, Type, TypeVar, get_type_hints
 
 __all__ = [
     "ASN1Error",
@@ -75,7 +75,6 @@ def _decode_length(data: bytes, offset: int) -> tuple[int, int]:
 
 # Integer helpers
 
-
 def _int_to_bytes(value: int) -> bytes:
     if value == 0:
         return b"\x00"
@@ -94,9 +93,15 @@ def _encode_tlv(tag: int, content: bytes) -> bytes:
     return bytes([tag]) + _encode_length(len(content)) + content
 
 
-class Integer(int):
+class Integer:
+    __slots__ = ("value",)
+    value: int
+
+    def __init__(self, value: int):
+        self.value = int(value)
+
     def dumps(self) -> bytes:
-        return _encode_tlv(_TAG_INTEGER, _int_to_bytes(int(self)))
+        return _encode_tlv(_TAG_INTEGER, _int_to_bytes(self.value))
 
     @classmethod
     def loads(cls: Type["Integer"], data: bytes) -> "Integer":
@@ -109,6 +114,22 @@ class Integer(int):
         _validate_integer_bytes(content)
         return cls(int.from_bytes(content, "big", signed=True))
 
+    def __int__(self) -> int:
+        return self.value
+
+    def __index__(self) -> int:
+        return self.value
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, Integer):
+            return self.value == other.value
+        if isinstance(other, int):
+            return self.value == other
+        return False
+
+    def __repr__(self) -> str:  # pragma: no cover - simple
+        return f"Integer({self.value})"
+
 
 def _validate_integer_bytes(content: bytes) -> None:
     if not content:
@@ -120,16 +141,38 @@ def _validate_integer_bytes(content: bytes) -> None:
             raise ASN1DecodeError("INTEGER has non-minimal leading 0xFF")
 
 
-class ObjectIdentifier(tuple[int, ...]):
-    def __new__(cls, value: Iterable[int]) -> "ObjectIdentifier":
-        items = tuple(int(v) for v in value)
-        _validate_oid(items)
-        return cast("ObjectIdentifier", super().__new__(cls, items))
+class ObjectIdentifier:
+    __slots__ = ("arcs",)
+    arcs: Tuple[int, ...]
+
+    def __init__(self, value: Iterable[int]):
+        arcs = tuple(int(v) for v in value)
+        _validate_oid(arcs)
+        self.arcs = arcs
+
+    def __iter__(self):  # pragma: no cover - trivial
+        return iter(self.arcs)
+
+    def __len__(self) -> int:  # pragma: no cover - trivial
+        return len(self.arcs)
+
+    def __getitem__(self, idx: int) -> int:  # pragma: no cover - trivial
+        return self.arcs[idx]
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, ObjectIdentifier):
+            return self.arcs == other.arcs
+        if isinstance(other, tuple):
+            return self.arcs == other
+        return False
+
+    def __repr__(self) -> str:  # pragma: no cover - simple
+        return f"ObjectIdentifier({self.arcs})"
 
     def dumps(self) -> bytes:
-        first, second = self[0], self[1]
+        first, second = self.arcs[0], self.arcs[1]
         head = bytes([40 * first + second])
-        tail = b"".join(_encode_oid_arc(arc) for arc in self[2:])
+        tail = b"".join(_encode_oid_arc(arc) for arc in self.arcs[2:])
         return _encode_tlv(_TAG_OBJECT_ID, head + tail)
 
     @classmethod
@@ -199,12 +242,15 @@ def _decode_oid_arc(data: bytes, offset: int) -> tuple[int, int]:
         # loop continues if continuation bit set
 
 
-class OctetString(bytes):
-    def __new__(cls, value: bytes | bytearray | memoryview) -> "OctetString":
-        return cast("OctetString", super().__new__(cls, bytes(value)))
+class OctetString:
+    __slots__ = ("data",)
+    data: bytes
+
+    def __init__(self, value: bytes | bytearray | memoryview):
+        self.data = bytes(value)
 
     def dumps(self) -> bytes:
-        return _encode_tlv(_TAG_OCTET_STRING, bytes(self))
+        return _encode_tlv(_TAG_OCTET_STRING, self.data)
 
     @classmethod
     def loads(cls: Type["OctetString"], data: bytes) -> "OctetString":
@@ -214,6 +260,22 @@ class OctetString(bytes):
         end = start + length
         _ensure_boundary(data, end)
         return cls(data[start:end])
+
+    def __bytes__(self) -> bytes:  # pragma: no cover - trivial
+        return self.data
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, OctetString):
+            return self.data == other.data
+        if isinstance(other, (bytes, bytearray, memoryview)):
+            return self.data == bytes(other)
+        return False
+
+    def __len__(self) -> int:  # pragma: no cover - trivial
+        return len(self.data)
+
+    def __repr__(self) -> str:  # pragma: no cover - simple
+        return f"OctetString({self.data!r})"
 
 
 class BitString:
