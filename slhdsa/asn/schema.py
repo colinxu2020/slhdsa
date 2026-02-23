@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, ClassVar, Dict, Iterable, Tuple, Type, TypeVar, get_type_hints
+from typing import Any, ClassVar, Dict, Iterable, Iterator, Tuple, Type, TypeVar, get_type_hints, overload
 
 __all__ = [
     "ASN1Error",
@@ -150,13 +150,19 @@ class ObjectIdentifier:
         _validate_oid(arcs)
         self.arcs = arcs
 
-    def __iter__(self):  # pragma: no cover - trivial
+    def __iter__(self) -> Iterator[int]:  # pragma: no cover - trivial
         return iter(self.arcs)
 
     def __len__(self) -> int:  # pragma: no cover - trivial
         return len(self.arcs)
 
-    def __getitem__(self, idx: int) -> int:  # pragma: no cover - trivial
+    @overload
+    def __getitem__(self, idx: int) -> int: ...
+
+    @overload
+    def __getitem__(self, idx: slice) -> tuple[int, ...]: ...
+
+    def __getitem__(self, idx: int | slice) -> int | tuple[int, ...]:  # pragma: no cover - trivial
         return self.arcs[idx]
 
     def __eq__(self, other: object) -> bool:
