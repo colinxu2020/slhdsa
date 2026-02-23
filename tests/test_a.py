@@ -125,5 +125,13 @@ def test7(tmp_path: Path) -> None:
         sec = KeyPair.gen(para).sec
         sec_path = tmp_path / 'sec.pem'
         sec.to_pkcs(sec_path.as_posix())
-        assert sec.from_pkcs(sec_path.as_posix()) == sec
+        assert SecretKey.from_pkcs(sec_path.as_posix()) == sec
+    _for_all(judge)
+
+def test8(tmp_path: Path) -> None:
+    def judge(para):
+        pub = KeyPair.gen(para).pub
+        pub_path = tmp_path / 'pub.pem'
+        pub.to_pkcs(pub_path.as_posix())
+        assert PublicKey.from_pkcs(pub_path.as_posix()) == pub
     _for_all(judge)

@@ -18,6 +18,11 @@ class PrivateKeyInfo(slhdsa.asn.schema.Schema):
     private_key: slhdsa.asn.OctetString
 
 
+class PublicKeyInfo(slhdsa.asn.schema.Schema):
+    algorithm: AlgorithmIdentifier
+    public_key: slhdsa.asn.BitString
+
+
 @dataclass
 class PublicKey:
     key: tuple[bytes, bytes]
@@ -37,6 +42,62 @@ class PublicKey:
 
     def __str__(self) -> str:
         return f'<SLHDSA Public Key: {self.digest().hex()}>'
+
+    @classmethod
+    def from_pkcs(cls, filename: str) -> "PublicKey":
+        with open(filename, 'r') as fp:
+            pubkey = [i[:-1] for i in fp]
+        while pubkey[-1] == '':
+            del pubkey[-1]
+        if pubkey[0] != '-----BEGIN PUBLIC KEY-----' or pubkey[-1] != '-----END PUBLIC KEY-----':
+            raise ValueError("Invalid PKCS Key")
+        structure = PublicKeyInfo.loads(b64decode((''.join(pubkey[1:-1])).encode()))
+        oid = structure.algorithm.oid
+        digest = bytes(structure.public_key)
+        if oid[:8] != (2, 16, 840, 1, 101, 3, 4, 3) or oid[8] < 20 or oid[8] > 31:
+            raise ValueError("Non-SLHDSA Key Found")
+        if oid[8] == 20:
+            algo = slhdsa.lowlevel.parameters.sha2_128s
+        if oid[8] == 21:
+            algo = slhdsa.lowlevel.parameters.sha2_128f
+        if oid[8] == 22:
+            algo = slhdsa.lowlevel.parameters.sha2_192s
+        if oid[8] == 23:
+            algo = slhdsa.lowlevel.parameters.sha2_192f
+        if oid[8] == 24:
+            algo = slhdsa.lowlevel.parameters.sha2_256s
+        if oid[8] == 25:
+            algo = slhdsa.lowlevel.parameters.sha2_256f
+        if oid[8] == 26:
+            algo = slhdsa.lowlevel.parameters.shake_128s
+        if oid[8] == 27:
+            algo = slhdsa.lowlevel.parameters.shake_128f
+        if oid[8] == 26:
+            algo = slhdsa.lowlevel.parameters.shake_128s
+        if oid[8] == 27:
+            algo = slhdsa.lowlevel.parameters.shake_128f
+        if oid[8] == 28:
+            algo = slhdsa.lowlevel.parameters.shake_192s
+        if oid[8] == 29:
+            algo = slhdsa.lowlevel.parameters.shake_192f
+        if oid[8] == 30:
+            algo = slhdsa.lowlevel.parameters.shake_256s
+        if oid[8] == 31:
+            algo = slhdsa.lowlevel.parameters.shake_256f
+        return cls.from_digest(digest, algo)
+
+    def to_pkcs(self, filename: str) -> None:
+        structure = PublicKeyInfo(
+            algorithm=AlgorithmIdentifier(oid=self.par.objectid),
+            public_key=slhdsa.asn.BitString(self.digest()),
+        )
+        crt = b64encode(structure.dumps()).decode()
+        with open(filename, 'w') as fp:
+            fp.write('-----BEGIN PUBLIC KEY-----\n')
+            for i in range((len(crt) + 63) // 64):
+                fp.write(crt[i*64:(i+1)*64])
+                fp.write('\n')
+            fp.write('-----END PUBLIC KEY-----\n')
 
 
 @dataclass
