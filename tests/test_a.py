@@ -142,3 +142,12 @@ def test9() -> None:
         assert kp.sec.pubkey == kp.pub
         assert kp == kp.sec.keypair
     _for_all(judge)
+
+def test10() -> None:
+    def judge(para):
+        kp = KeyPair.gen(para)
+        msg = randbytes(20)
+        assert kp.verify_pure(msg, kp.sign_pure(msg))
+        assert kp.verify_hash(msg, kp.sign_hash(msg))
+    _for_all(judge)
+
