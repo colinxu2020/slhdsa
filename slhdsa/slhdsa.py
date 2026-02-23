@@ -5,14 +5,14 @@ import slhdsa.lowlevel.slhdsa as lowlevel
 import slhdsa.lowlevel.parameters
 from slhdsa.lowlevel.parameters import Parameter
 import slhdsa.exception as exc
-import slhdsa.asn
+import slhdsa.asn.schema
 
 
-class AlgorithmIdentifier(slhdsa.asn.Schema):
+class AlgorithmIdentifier(slhdsa.asn.schema.Schema):
     oid: slhdsa.asn.ObjectIdentifier
 
 
-class PrivateKeyInfo(slhdsa.asn.Schema):
+class PrivateKeyInfo(slhdsa.asn.schema.Schema):
     version: slhdsa.asn.Integer
     algorithm: AlgorithmIdentifier
     private_key: slhdsa.asn.OctetString
