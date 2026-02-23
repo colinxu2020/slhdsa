@@ -151,3 +151,17 @@ def test10() -> None:
         assert kp.verify_hash(msg, kp.sign_hash(msg))
     _for_all(judge)
 
+def test11() -> None:
+    kp = KeyPair.gen(sha2_256s)
+
+    with raises(ValueError):
+        kp.sign_pure(b"", ctx=b'1' * 256)
+
+    with raises(ValueError):
+        kp.sign_hash(b"", ctx=b'1' * 256)
+
+    with raises(ValueError):
+        kp.verify_pure(b"", b"", ctx=b'1' * 256)
+
+    with raises(ValueError):
+        kp.verify_hash(b"", b"", ctx=b'1' * 256)
