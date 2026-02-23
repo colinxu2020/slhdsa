@@ -288,10 +288,7 @@ class KeyPair:
         Verifies a Pure SLH-DSA signature.
         In most cases, we recommend that new applications use this API, which fully complies with the final version of the FIPS 205 specification.
         """
-        if len(ctx) > 255:
-            raise ValueError("Context too long")
-        msg = b'\x00' + bytes([len(ctx)]) + ctx + msg
-        return self.pub.verify(msg, sig)
+        return self.pub.verify_pure(msg, sig, ctx)
 
     def verify_hash(self, msg: bytes, sig: bytes, ctx: bytes = b'', prehash: Optional[Callable[[bytes], bytes]] = None) -> bool:
         """
@@ -303,30 +300,7 @@ class KeyPair:
         Note that your function shall return a byte string contains the Object ID of your hash function followed by the actually hash.
         The hash function is automatically determined by the security category of the parameter otherwise.
         """
-        if len(ctx) > 255:
-            raise ValueError("Context too long")
-        par = self.sec.par
-        if prehash is None:
-            if par.objectid[-1] in (20, 21):
-                def prehash(data: bytes) -> bytes:
-                    return (HASH_ALGORITHM_OID_PREFIX + bytes([HASH_ALGORITHMS_OID_BY_FUNCTION[hashlib.sha256]])+
-                            hashlib.sha256(data).digest())
-            elif par.objectid[-1] in (22, 23, 24, 25):
-                def prehash(data: bytes) -> bytes:
-                    return (HASH_ALGORITHM_OID_PREFIX + bytes([HASH_ALGORITHMS_OID_BY_FUNCTION[hashlib.sha512]])+
-                            hashlib.sha512(data).digest())
-            elif par.objectid[-1] in (26, 27):
-                def prehash(data: bytes) -> bytes:
-                    return (HASH_ALGORITHM_OID_PREFIX + bytes([HASH_ALGORITHMS_OID_BY_FUNCTION[hashlib.shake_128]])+
-                            hashlib.shake_128(data).digest(16))
-            elif par.objectid[-1] in (28, 29, 30, 31):
-                def prehash(data: bytes) -> bytes:
-                    return (HASH_ALGORITHM_OID_PREFIX + bytes([HASH_ALGORITHMS_OID_BY_FUNCTION[hashlib.shake_256]])+
-                            hashlib.shake_256(data).digest(32))
-            else:
-                assert False
-        msg = b'\x01' + bytes([len(ctx)]) + ctx + prehash(msg)
-        return self.pub.verify(msg, sig)
+        return self.pub.verify_hash(msg, sig, ctx, prehash)
 
     def sign(self, msg: bytes, randomize: bool = False) -> bytes:
         """
