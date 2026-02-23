@@ -1,534 +1,455 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Annotated, Any, ClassVar, TypeVar, get_args, get_origin, get_type_hints, Callable
+from typing import Any, ClassVar, Dict, Iterable, Tuple, Type, TypeVar, get_type_hints
 
-try:
-    from mypy_extensions import mypyc_attr
-except ImportError:
-    T = TypeVar("T")
-    def mypyc_attr(*attrs: str, **kwattrs: object) -> Callable[[T], T]:
-        def wrapper(obj: T) -> T:
-            return obj
-        return wrapper
-
-__all__ = ["Schema", "Sequence", "Integer", "OctetString", "ObjectIdentifier"]
-
-
-@mypyc_attr(native_class=False)
-class _SequenceMeta(type):
-    def __getitem__(cls, parameters: Any) -> Any:
-        if not isinstance(parameters, tuple):
-            parameters = (parameters,)
-        return Annotated[cls, parameters]
+__all__ = [
+    "ASN1Error",
+    "ASN1DecodeError",
+    "ASN1LengthError",
+    "ASN1TagError",
+    "Integer",
+    "ObjectIdentifier",
+    "OctetString",
+    "BitString",
+    "Schema",
+    "Sequence",
+]
 
 
-@mypyc_attr(native_class=False)
-class Sequence(metaclass=_SequenceMeta):
-    """Marker used inside typing.Annotated metadata to describe ASN.1 SEQUENCE nodes."""
+class ASN1Error(ValueError):
+    """Base class for ASN.1 encoding/decoding errors."""
 
 
-@mypyc_attr(native_class=False)
-class OctetString(bytes):
-    """Runtime representation of ASN.1 OCTET STRING that behaves like bytes."""
-
-    _asn_descriptor: ClassVar["_OctetStringDescriptor"]
-
-    def __new__(cls, value: bytes | bytearray | memoryview) -> "OctetString":
-        return bytes.__new__(cls, bytes(value))
+class ASN1DecodeError(ASN1Error):
+    pass
 
 
-class _ASN1Type:
-    tag: int
-
-    def decode(self, data: bytes, offset: int) -> tuple[Any, int]:
-        raise NotImplementedError
-
-    def encode(self, value: Any) -> bytes:
-        raise NotImplementedError
+class ASN1LengthError(ASN1DecodeError):
+    pass
 
 
-@dataclass(frozen=True)
-class _FieldSpec:
-    name: str
-    descriptor: _ASN1Type
+class ASN1TagError(ASN1DecodeError):
+    pass
 
 
-def _read_length(data: bytes, offset: int) -> tuple[int, int]:
-    if offset >= len(data):
-        raise ValueError("ASN.1 length is truncated")
-    first = data[offset]
-    offset += 1
-    if first < 0x80:
-        return first, offset
-    count = first & 0x7F
-    if count == 0:
-        raise ValueError("Indefinite lengths are not supported")
-    if offset + count > len(data):
-        raise ValueError("ASN.1 length is truncated")
-    length = int.from_bytes(data[offset:offset + count], "big")
-    return length, offset + count
+_T = TypeVar("_T", bound="Schema")
 
 
-def _read_tlv(data: bytes, offset: int) -> tuple[int, bytes, int]:
-    if offset >= len(data):
-        raise ValueError("ASN.1 tag is truncated")
-    tag = data[offset]
-    offset += 1
-    length, offset = _read_length(data, offset)
-    end = offset + length
-    if end > len(data):
-        raise ValueError("ASN.1 payload is truncated")
-    return tag, data[offset:end], end
+_TAG_INTEGER = 0x02
+_TAG_BIT_STRING = 0x03
+_TAG_OCTET_STRING = 0x04
+_TAG_OBJECT_ID = 0x06
+_TAG_SEQUENCE = 0x30
 
+
+# Length helpers
 
 def _encode_length(length: int) -> bytes:
     if length < 0:
-        raise ValueError("Negative length is not allowed")
+        raise ASN1LengthError("Length cannot be negative")
     if length < 0x80:
-        return bytes((length,))
+        return bytes([length])
     needed = (length.bit_length() + 7) // 8
-    return bytes((0x80 | needed,)) + length.to_bytes(needed, "big")
+    length_bytes = length.to_bytes(needed, "big")
+    return bytes([0x80 | needed]) + length_bytes
 
 
-def _encode_tlv(tag: int, payload: bytes) -> bytes:
-    return bytes((tag,)) + _encode_length(len(payload)) + payload
+def _decode_length(data: bytes, offset: int) -> tuple[int, int]:
+    if offset >= len(data):
+        raise ASN1LengthError("Missing length byte")
+    first = data[offset]
+    if first < 0x80:
+        return first, offset + 1
+    count = first & 0x7F
+    if count == 0:
+        raise ASN1LengthError("Indefinite length not supported")
+    if offset + 1 + count > len(data):
+        raise ASN1LengthError("Length bytes truncated")
+    if count > 1 and data[offset + 1] == 0:
+        raise ASN1LengthError("Non-minimal length encoding")
+    value = int.from_bytes(data[offset + 1 : offset + 1 + count], "big")
+    if value < 0x80:
+        raise ASN1LengthError("Non-minimal length encoding")
+    return value, offset + 1 + count
 
 
-def _encode_integer_content(value: int) -> bytes:
+# Integer helpers
+
+
+def _int_to_bytes(value: int) -> bytes:
     if value == 0:
         return b"\x00"
-    signed = value < 0
-    size = max(1, (value.bit_length() + 7) // 8)
-    content = value.to_bytes(size, "big", signed=True)
-    while len(content) > 1:
-        if not signed and content[0] == 0x00 and (content[1] & 0x80) == 0:
-            content = content[1:]
-            continue
-        if signed and content[0] == 0xFF and (content[1] & 0x80) == 0x80:
-            content = content[1:]
-            continue
-        break
-    if not signed and (content[0] & 0x80):
-        content = b"\x00" + content
-    return content
-
-
-def _encode_base128(value: int) -> bytes:
+    bits = value.bit_length()
+    length = max(1, (bits + 7) // 8)
     if value < 0:
-        raise ValueError("Object identifier components must be non-negative")
-    if value == 0:
-        return b"\x00"
-    encoded = bytearray()
-    while value:
-        encoded.append(value & 0x7F)
-        value >>= 7
-    encoded.reverse()
-    for idx in range(len(encoded) - 1):
-        encoded[idx] |= 0x80
-    return bytes(encoded)
+        while value < -(1 << (length * 8 - 1)):
+            length += 1
+    else:
+        if value >> (length * 8 - 1):
+            length += 1
+    return value.to_bytes(length, "big", signed=True)
 
 
-class _IntegerDescriptor(_ASN1Type):
-    tag = 0x02
-    python_type = int
-
-    def decode(self, data: bytes, offset: int) -> tuple[int, int]:
-        tag, payload, end = _read_tlv(data, offset)
-        if tag != self.tag:
-            raise ValueError("Unexpected tag for INTEGER")
-        return int.from_bytes(payload, "big", signed=True), end
-
-    def encode(self, value: Any) -> bytes:
-        if not isinstance(value, int):
-            raise TypeError("INTEGER expects an int value")
-        return _encode_tlv(self.tag, _encode_integer_content(value))
+def _encode_tlv(tag: int, content: bytes) -> bytes:
+    return bytes([tag]) + _encode_length(len(content)) + content
 
 
-class _OctetStringDescriptor(_ASN1Type):
-    tag = 0x04
-    python_type = OctetString
+class Integer(int):
+    def dumps(self) -> bytes:
+        return _encode_tlv(_TAG_INTEGER, _int_to_bytes(int(self)))
 
-    def decode(self, data: bytes, offset: int) -> tuple[OctetString, int]:
-        tag, payload, end = _read_tlv(data, offset)
-        if tag != self.tag:
-            raise ValueError("Unexpected tag for OCTET STRING")
-        return OctetString(payload), end
-
-    def encode(self, value: Any) -> bytes:
-        if isinstance(value, OctetString):
-            payload = bytes(value)
-        elif isinstance(value, (bytes, bytearray, memoryview)):
-            payload = bytes(value)
-        else:
-            raise TypeError("OCTET STRING expects a bytes-like value")
-        return _encode_tlv(self.tag, payload)
+    @classmethod
+    def loads(cls: Type["Integer"], data: bytes) -> "Integer":
+        tag, length, start = _read_tlv_header(data, 0)
+        if tag != _TAG_INTEGER:
+            raise ASN1TagError("Not an INTEGER tag")
+        end = start + length
+        _ensure_boundary(data, end)
+        content = data[start:end]
+        _validate_integer_bytes(content)
+        return cls(int.from_bytes(content, "big", signed=True))
 
 
-class _ObjectIdentifierDescriptor(_ASN1Type):
-    tag = 0x06
-    python_type = tuple
-
-    def decode(self, data: bytes, offset: int) -> tuple[tuple[int, ...], int]:
-        tag, payload, end = _read_tlv(data, offset)
-        if tag != self.tag:
-            raise ValueError("Unexpected tag for OBJECT IDENTIFIER")
-        if not payload:
-            raise ValueError("OBJECT IDENTIFIER payload is empty")
-        first = payload[0]
-        values: list[int] = [first // 40, first % 40]
-        current = 0
-        idx = 1
-        while idx < len(payload):
-            byte = payload[idx]
-            current = (current << 7) | (byte & 0x7F)
-            if byte & 0x80:
-                idx += 1
-                continue
-            values.append(current)
-            current = 0
-            idx += 1
-        if current != 0:
-            raise ValueError("OBJECT IDENTIFIER payload is truncated")
-        return tuple(values), end
-
-    def encode(self, value: Any) -> bytes:
-        if not isinstance(value, tuple):
-            raise TypeError("OBJECT IDENTIFIER expects a tuple of integers")
-        if len(value) < 2:
-            raise ValueError("OBJECT IDENTIFIER must have at least two components")
-        first, second = value[0], value[1]
-        if first < 0 or first > 2:
-            raise ValueError("Invalid OBJECT IDENTIFIER first component")
-        if second < 0:
-            raise ValueError("Invalid OBJECT IDENTIFIER second component")
-        if first < 2 and second >= 40:
-            raise ValueError("Invalid OBJECT IDENTIFIER second component for first component < 2")
-        payload = bytearray()
-        payload.append(first * 40 + second)
-        for component in value[2:]:
-            if not isinstance(component, int):
-                raise TypeError("OBJECT IDENTIFIER components must be integers")
-            payload.extend(_encode_base128(component))
-        return _encode_tlv(self.tag, bytes(payload))
+def _validate_integer_bytes(content: bytes) -> None:
+    if not content:
+        raise ASN1DecodeError("Empty INTEGER content")
+    if len(content) > 1:
+        if content[0] == 0x00 and content[1] & 0x80 == 0:
+            raise ASN1DecodeError("INTEGER has non-minimal leading 0")
+        if content[0] == 0xFF and content[1] & 0x80 == 0x80:
+            raise ASN1DecodeError("INTEGER has non-minimal leading 0xFF")
 
 
-def _extract_sequence_element_types(annotation: Any) -> tuple[Any, ...]:
-    origin = get_origin(annotation)
-    if origin not in (tuple, list, set):
-        return ()
-    args = get_args(annotation)
-    if not args:
-        return ()
-    return args
-
-
-def _expected_type_for_index(element_types: tuple[Any, ...], index: int) -> Any | None:
-    if not element_types:
-        return None
-    if len(element_types) == 1:
-        return element_types[0]
-    if len(element_types) == 2 and element_types[1] is Ellipsis:
-        return element_types[0]
-    if index < len(element_types):
-        candidate = element_types[index]
-        if candidate is Ellipsis:
-            return element_types[index - 1] if index > 0 else None
-        return candidate
-    if element_types and element_types[-1] is Ellipsis:
-        return element_types[-2] if len(element_types) >= 2 else None
-    return None
-
-
-def _strip_annotated(expected: Any) -> Any:
-    if get_origin(expected) is Annotated:
-        return get_args(expected)[0]
-    return expected
-
-
-def _coerce_value_to_python_type(value: Any, expected: Any | None) -> Any:
-    if expected is None:
-        return value
-    expected = _strip_annotated(expected)
-    if expected is Any:
-        return value
-    if expected == Any:
-        return value
-    if expected is bytes:
-        if isinstance(value, OctetString):
-            return bytes(value)
-        if isinstance(value, (bytearray, memoryview)):
-            return bytes(value)
-    return value
-
-
-class _SequenceDescriptor(_ASN1Type):
-    tag = 0x30
-
-    def __init__(
-        self,
-        children: tuple[_ASN1Type, ...],
-        python_type: Any,
-        element_types: tuple[Any, ...] = (),
-    ):
-        self._children = children
-        self._python_type = python_type
-        self._element_types = element_types
-
-    def decode(self, data: bytes, offset: int) -> tuple[Any, int]:
-        tag, payload, end = _read_tlv(data, offset)
-        if tag != self.tag:
-            raise ValueError("Unexpected tag for SEQUENCE")
-        inner_offset = 0
-        collected: list[Any] = []
-        while inner_offset < len(payload):
-            if len(collected) >= len(self._children):
-                raise ValueError("SEQUENCE contains more elements than expected")
-            descriptor = self._children[len(collected)]
-            value, inner_offset = descriptor.decode(payload, inner_offset)
-            expected = _expected_type_for_index(self._element_types, len(collected))
-            collected.append(_coerce_value_to_python_type(value, expected))
-        if len(collected) != len(self._children):
-            raise ValueError("SEQUENCE contains fewer elements than expected")
-        return self._build_python_value(collected), end
-
-    def encode(self, value: Any) -> bytes:
-        items = self._prepare_iterable(value)
-        if len(items) != len(self._children):
-            raise ValueError("SEQUENCE length does not match schema definition")
-        pieces = [descriptor.encode(item) for descriptor, item in zip(self._children, items)]
-        return _encode_tlv(self.tag, b"".join(pieces))
-
-    def _build_python_value(self, values: list[Any]) -> Any:
-        target = self._python_type
-        if target is tuple:
-            return tuple(values)
-        if target is list:
-            return list(values)
-        if target is set:
-            return set(values)
-        if isinstance(target, type) and issubclass(target, Schema):
-            obj = target.__new__(target)
-            for spec, value in zip(target._asn_fields, values):
-                setattr(obj, spec.name, value)
-            return obj
-        if callable(target):
-            return target(values)
-        return tuple(values)
-
-    def _prepare_iterable(self, value: Any) -> tuple[Any, ...]:
-        if isinstance(value, tuple):
-            return value
-        if isinstance(value, list):
-            return tuple(value)
-        if isinstance(value, set):
-            return tuple(value)
-        if isinstance(value, Schema) and isinstance(self._python_type, type) and issubclass(self._python_type, Schema):
-            return tuple(getattr(value, spec.name) for spec in value._asn_fields)
-        if hasattr(value, "__iter__"):
-            return tuple(value)
-        raise TypeError("SEQUENCE value must be an iterable")
-
-
-class _SchemaFieldDescriptor(_ASN1Type):
-    tag = 0x30
-
-    def __init__(self, schema_cls: type["Schema"]):
-        self._schema_cls = schema_cls
-
-    def decode(self, data: bytes, offset: int) -> tuple["Schema", int]:
-        return self._schema_cls._decode_stream(data, offset)
-
-    def encode(self, value: Any) -> bytes:
-        if not isinstance(value, self._schema_cls):
-            raise TypeError("Value does not match schema field type")
-        return value.dumps()
-
-
-_INTEGER_DESCRIPTOR = _IntegerDescriptor()
-_OCTET_STRING_DESCRIPTOR = _OctetStringDescriptor()
-_OBJECT_IDENTIFIER_DESCRIPTOR = _ObjectIdentifierDescriptor()
-
-OctetString._asn_descriptor = _OCTET_STRING_DESCRIPTOR
-
-Integer = Annotated[int, _INTEGER_DESCRIPTOR]
-ObjectIdentifier = Annotated[tuple[int, ...], _OBJECT_IDENTIFIER_DESCRIPTOR]
-
-
-def _normalize_python_type(annotation: Any) -> Any:
-    origin = get_origin(annotation)
-    if origin is not None:
-        return origin
-    if isinstance(annotation, type):
-        return annotation
-    return tuple
-
-
-def _descriptor_from_annotation(annotation: Any, python_type: Any | None = None) -> _ASN1Type:
-    base, extras = _unpack_annotated(annotation)
-    normalized_python_type = _normalize_python_type(python_type if python_type is not None else base)
-    element_types = _extract_sequence_element_types(base)
-    descriptor: _ASN1Type | None = None
-    for extra in extras:
-        descriptor = _descriptor_from_extra(extra, normalized_python_type, descriptor, element_types)
-    if descriptor is None:
-        descriptor = _descriptor_from_base(base, normalized_python_type, element_types)
-    if descriptor is None:
-        if isinstance(base, type) and base is Sequence:
-            raise TypeError("Sequence annotations must include element descriptors")
-        raise TypeError(f"Unsupported ASN.1 annotation: {annotation!r}")
-    return descriptor
-
-
-def _descriptor_from_extra(
-    extra: Any,
-    python_type: Any,
-    current: _ASN1Type | None,
-    element_types: tuple[Any, ...],
-) -> _ASN1Type | None:
-    resolved = _resolve_descriptor(extra, python_type, element_types)
-    return resolved if resolved is not None else current
-
-
-def _resolve_descriptor(candidate: Any, python_type: Any, element_types: tuple[Any, ...]) -> _ASN1Type | None:
-    if isinstance(candidate, _ASN1Type):
-        if isinstance(candidate, _SequenceDescriptor):
-            return _SequenceDescriptor(candidate._children, python_type, element_types)
-        return candidate
-    if isinstance(candidate, type):
-        if issubclass(candidate, Schema):
-            return _SchemaFieldDescriptor(candidate)
-        descriptor = getattr(candidate, "_asn_descriptor", None)
-        if isinstance(descriptor, _ASN1Type):
-            return descriptor
-    origin = get_origin(candidate)
-    if origin is Annotated:
-        base, extras = _unpack_annotated(candidate)
-        if isinstance(base, type) and base is Sequence:
-            if not extras:
-                raise TypeError("Sequence annotations must include element descriptors")
-            children = extras[0]
-            if not isinstance(children, tuple):
-                children = (children,)
-            child_descriptors = tuple(_descriptor_from_annotation(child) for child in children)
-            return _SequenceDescriptor(
-                child_descriptors,
-                _normalize_python_type(python_type),
-                element_types,
-            )
-        return _descriptor_from_annotation(candidate, python_type)
-    return None
-
-
-def _descriptor_from_base(base: Any, python_type: Any, element_types: tuple[Any, ...]) -> _ASN1Type | None:
-    resolved = _resolve_descriptor(base, python_type, element_types)
-    if resolved is not None:
-        return resolved
-    origin = get_origin(base)
-    if origin is not None:
-        return _descriptor_from_base(origin, python_type, element_types)
-    return None
-
-
-def _unpack_annotated(annotation: Any) -> tuple[Any, tuple[Any, ...]]:
-    if get_origin(annotation) is Annotated:
-        args = get_args(annotation)
-        return args[0], tuple(args[1:])
-    return annotation, ()
-
-
-@mypyc_attr(native_class=False)
-class _SchemaMeta(type):
-    _asn_fields: ClassVar[tuple[_FieldSpec, ...]]
-    _asn_descriptor: ClassVar[_SequenceDescriptor]
-    __slots__: ClassVar[tuple[str, ...]]
-
-    def __new__(mcls, name: str, bases: tuple[type, ...], namespace: dict[str, Any]) -> type:
-        _new: Any = super().__new__  # Trick for mypyc
-        cls = _new(mcls, name, bases, namespace)
-        if name == "Schema":
-            base_fields: tuple[_FieldSpec, ...] = ()
-            setattr(cls, "_asn_fields", base_fields)
-            setattr(cls, "_asn_descriptor", _SequenceDescriptor((), tuple))
-            setattr(cls, "__slots__", ())
-            return cls
-        resolved_hints = get_type_hints(cls, include_extras=True)
-        own_annotations = namespace.get("__annotations__", {})
-        field_specs: list[_FieldSpec] = []
-        seen: set[str] = set()
-        for base in cls.__mro__[1:]:
-            base_fields = getattr(base, "_asn_fields", ())
-            for spec in base_fields:
-                if spec.name not in seen:
-                    field_specs.append(spec)
-                    seen.add(spec.name)
-        for name_key in own_annotations:
-            if name_key not in resolved_hints:
-                raise TypeError(f"Annotation for field {name_key!r} could not be resolved")
-            descriptor = _descriptor_from_annotation(resolved_hints[name_key])
-            spec = _FieldSpec(name_key, descriptor)
-            if name_key in seen:
-                for idx, existing in enumerate(field_specs):
-                    if existing.name == name_key:
-                        field_specs[idx] = spec
-                        break
-            else:
-                field_specs.append(spec)
-                seen.add(name_key)
-        field_tuple = tuple(field_specs)
-        descriptor = _SequenceDescriptor(tuple(spec.descriptor for spec in field_tuple), tuple)
-        setattr(cls, "_asn_fields", field_tuple)
-        setattr(cls, "_asn_descriptor", descriptor)
-        setattr(cls, "__slots__", tuple(spec.name for spec in field_tuple))
-        return cls
-
-
-SchemaT = TypeVar("SchemaT", bound="Schema")
-
-
-@mypyc_attr(native_class=False)
-class Schema(metaclass=_SchemaMeta):
-    __slots__ = ()
-    _asn_fields: ClassVar[tuple[_FieldSpec, ...]]
-    _asn_descriptor: ClassVar[_SequenceDescriptor]
-
-    def __init__(self, *values: Any, **named_values: Any) -> None:
-        field_count = len(self._asn_fields)
-        if values:
-            if named_values:
-                raise TypeError("Cannot mix positional and keyword arguments when constructing a schema")
-            if len(values) != field_count:
-                raise TypeError(f"Expected {field_count} values, got {len(values)}")
-            for spec, value in zip(self._asn_fields, values):
-                setattr(self, spec.name, value)
-            return
-        if len(named_values) != field_count:
-            missing = [spec.name for spec in self._asn_fields if spec.name not in named_values]
-            if missing:
-                raise TypeError(f"Missing values for fields: {', '.join(missing)}")
-            raise TypeError("Unexpected number of values for schema construction")
-        for spec in self._asn_fields:
-            setattr(self, spec.name, named_values.pop(spec.name))
+class ObjectIdentifier(tuple):
+    def __new__(cls, value: Iterable[int]):
+        items = tuple(int(v) for v in value)
+        _validate_oid(items)
+        return super().__new__(cls, items)
 
     def dumps(self) -> bytes:
-        values = [getattr(self, spec.name) for spec in self._asn_fields]
-        return self._asn_descriptor.encode(values)
+        first, second = self[0], self[1]
+        head = bytes([40 * first + second])
+        tail = b"".join(_encode_oid_arc(arc) for arc in self[2:])
+        return _encode_tlv(_TAG_OBJECT_ID, head + tail)
 
     @classmethod
-    def loads(cls: type[SchemaT], data: bytes) -> SchemaT:
-        obj, offset = cls._decode_stream(data, 0)
-        if offset != len(data):
-            raise ValueError("Trailing bytes after ASN.1 structure")
-        return obj
+    def loads(cls: Type["ObjectIdentifier"], data: bytes) -> "ObjectIdentifier":
+        tag, length, start = _read_tlv_header(data, 0)
+        if tag != _TAG_OBJECT_ID:
+            raise ASN1TagError("Not an OBJECT IDENTIFIER tag")
+        end = start + length
+        _ensure_boundary(data, end)
+        content = data[start:end]
+        if not content:
+            raise ASN1DecodeError("OBJECT IDENTIFIER is empty")
+        first_octet = content[0]
+        if first_octet < 40:
+            first, second = 0, first_octet
+        elif first_octet < 80:
+            first, second = 1, first_octet - 40
+        else:
+            first, second = 2, first_octet - 80
+        arcs = [first, second]
+        idx = 1
+        while idx < len(content):
+            arc, idx = _decode_oid_arc(content, idx)
+            arcs.append(arc)
+        return cls(tuple(arcs))
+
+
+def _validate_oid(arcs: Tuple[int, ...]) -> None:
+    if len(arcs) < 2:
+        raise ASN1Error("OID must contain at least two arcs")
+    if arcs[0] < 0 or arcs[0] > 2:
+        raise ASN1Error("First OID arc must be 0, 1, or 2")
+    if arcs[0] < 2 and not (0 <= arcs[1] < 40):
+        raise ASN1Error("Second OID arc out of range for first arc 0 or 1")
+    for arc in arcs:
+        if arc < 0:
+            raise ASN1Error("OID arcs must be non-negative")
+
+
+def _encode_oid_arc(arc: int) -> bytes:
+    if arc < 0:
+        raise ASN1Error("OID arcs must be non-negative")
+    if arc == 0:
+        return b"\x00"
+    out = bytearray()
+    value = arc
+    while value > 0:
+        out.append(0x80 | (value & 0x7F))
+        value >>= 7
+    out[0] &= 0x7F
+    out.reverse()
+    return bytes(out)
+
+
+def _decode_oid_arc(data: bytes, offset: int) -> tuple[int, int]:
+    if offset >= len(data):
+        raise ASN1DecodeError("Truncated OID arc")
+    value = 0
+    while True:
+        if offset >= len(data):
+            raise ASN1DecodeError("Truncated OID arc")
+        b = data[offset]
+        value = (value << 7) | (b & 0x7F)
+        offset += 1
+        if b & 0x80 == 0:
+            return value, offset
+        # loop continues if continuation bit set
+
+
+class OctetString(bytes):
+    def __new__(cls, value: bytes | bytearray | memoryview):
+        return super().__new__(cls, bytes(value))
+
+    def dumps(self) -> bytes:
+        return _encode_tlv(_TAG_OCTET_STRING, bytes(self))
 
     @classmethod
-    def _decode_stream(cls: type[SchemaT], data: bytes, offset: int) -> tuple[SchemaT, int]:
-        items, new_offset = cls._asn_descriptor.decode(data, offset)
-        instance = cls.__new__(cls)
-        for spec, value in zip(cls._asn_fields, items):
-            setattr(instance, spec.name, value)
-        return instance, new_offset
+    def loads(cls: Type["OctetString"], data: bytes) -> "OctetString":
+        tag, length, start = _read_tlv_header(data, 0)
+        if tag != _TAG_OCTET_STRING:
+            raise ASN1TagError("Not an OCTET STRING tag")
+        end = start + length
+        _ensure_boundary(data, end)
+        return cls(data[start:end])
+
+
+class BitString:
+    __slots__ = ("data", "unused_bits")
+
+    data: bytes
+    unused_bits: int
+
+    def __init__(self, data: bytes | bytearray | memoryview, unused_bits: int = 0):
+        if unused_bits < 0 or unused_bits > 7:
+            raise ASN1Error("unused_bits must be in range 0..7")
+        self.data = bytes(data)
+        self.unused_bits = unused_bits
+
+    def __bytes__(self) -> bytes:  # pragma: no cover - trivial
+        return self.data
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, BitString):
+            return self.data == other.data and self.unused_bits == other.unused_bits
+        return False
 
     def __repr__(self) -> str:
-        parts = ", ".join(f"{spec.name}={getattr(self, spec.name)!r}" for spec in self._asn_fields)
+        return f"BitString(data={self.data!r}, unused_bits={self.unused_bits})"
+
+    def dumps(self) -> bytes:
+        content = bytes([self.unused_bits]) + self.data
+        return _encode_tlv(_TAG_BIT_STRING, content)
+
+    @classmethod
+    def loads(cls: Type["BitString"], data: bytes) -> "BitString":
+        tag, length, start = _read_tlv_header(data, 0)
+        if tag != _TAG_BIT_STRING:
+            raise ASN1TagError("Not a BIT STRING tag")
+        end = start + length
+        _ensure_boundary(data, end)
+        if length == 0:
+            raise ASN1DecodeError("BIT STRING missing unused bits byte")
+        unused = data[start]
+        payload = data[start + 1 : end]
+        return cls(payload, unused)
+
+
+class Schema:
+    _fields_cache: ClassVar[Dict[Type["Schema"], tuple[str, ...]]] = {}
+    _types_cache: ClassVar[Dict[Type["Schema"], Dict[str, Type[Any]]]] = {}
+
+    def __init__(self, **kwargs: Any) -> None:
+        fields = self._field_names()
+        types = self._field_types()
+        missing = [name for name in fields if name not in kwargs]
+        if missing:
+            raise TypeError(f"Missing fields for {self.__class__.__name__}: {', '.join(missing)}")
+        extra = [name for name in kwargs if name not in fields]
+        if extra:
+            raise TypeError(f"Unexpected fields for {self.__class__.__name__}: {', '.join(extra)}")
+        for name in fields:
+            expected = types[name]
+            value = _coerce_value(expected, kwargs[name])
+            setattr(self, name, value)
+
+    @classmethod
+    def _field_names(cls) -> tuple[str, ...]:
+        cached = Schema._fields_cache.get(cls)
+        if cached is not None:
+            return cached
+        annotations = getattr(cls, "__annotations__", {})
+        names = tuple(annotations.keys())
+        Schema._fields_cache[cls] = names
+        return names
+
+    @classmethod
+    def _field_types(cls) -> Dict[str, Type[Any]]:
+        cached = Schema._types_cache.get(cls)
+        if cached is not None:
+            return cached
+        hints = get_type_hints(cls, globalns=_module_globals(cls))
+        Schema._types_cache[cls] = hints
+        return hints
+
+    def dumps(self) -> bytes:
+        body = b"".join(_encode_value(getattr(self, name)) for name in self._field_names())
+        return _encode_tlv(_TAG_SEQUENCE, body)
+
+    @classmethod
+    def loads(cls: Type[_T], data: bytes) -> _T:
+        tag, length, start = _read_tlv_header(data, 0)
+        if tag != _TAG_SEQUENCE:
+            raise ASN1TagError(f"Expected SEQUENCE for {cls.__name__}")
+        end = start + length
+        _ensure_boundary(data, end)
+        offset = start
+        types = cls._field_types()
+        values: Dict[str, Any] = {}
+        for name in cls._field_names():
+            expected = types[name]
+            value, offset = _decode_value(data, offset, expected)
+            values[name] = value
+        if offset != end:
+            raise ASN1LengthError("Extra bytes found after decoding SEQUENCE")
+        return cls(**values)
+
+    def __bytes__(self) -> bytes:  # pragma: no cover - trivial
+        return self.dumps()
+
+    def __repr__(self) -> str:
+        parts = ", ".join(f"{name}={getattr(self, name)!r}" for name in self._field_names())
         return f"{self.__class__.__name__}({parts})"
+
+
+class Sequence(Schema):
+    """Semantic alias for ASN.1 SEQUENCE."""
+
+
+def _module_globals(cls: Type[Any]) -> Dict[str, Any]:
+    import sys
+    import typing
+
+    env = dict(sys.modules[cls.__module__].__dict__)
+    for name, value in typing.__dict__.items():
+        if name not in env:
+            env[name] = value
+    env.setdefault("Schema", Schema)
+    env.setdefault("Sequence", Sequence)
+    env.setdefault("Integer", Integer)
+    env.setdefault("ObjectIdentifier", ObjectIdentifier)
+    env.setdefault("OctetString", OctetString)
+    env.setdefault("BitString", BitString)
+    return env
+
+
+def _read_tlv_header(data: bytes, offset: int) -> tuple[int, int, int]:
+    if offset >= len(data):
+        raise ASN1DecodeError("Missing tag")
+    tag = data[offset]
+    length, next_offset = _decode_length(data, offset + 1)
+    return tag, length, next_offset
+
+
+def _ensure_boundary(data: bytes, end: int) -> None:
+    if end > len(data):
+        raise ASN1LengthError("Content length exceeds available data")
+
+
+def _encode_value(value: Any) -> bytes:
+    if isinstance(value, Integer):
+        return value.dumps()
+    if isinstance(value, ObjectIdentifier):
+        return value.dumps()
+    if isinstance(value, OctetString):
+        return value.dumps()
+    if isinstance(value, BitString):
+        return value.dumps()
+    if isinstance(value, Schema):
+        return value.dumps()
+    raise TypeError(f"Unsupported ASN.1 value type: {type(value)!r}")
+
+
+def _decode_value(data: bytes, offset: int, expected: Type[Any]) -> tuple[Any, int]:
+    if expected is Integer or issubclass(expected, Integer):
+        tag, length, start = _read_tlv_header(data, offset)
+        if tag != _TAG_INTEGER:
+            raise ASN1TagError("Expected INTEGER")
+        end = start + length
+        _ensure_boundary(data, end)
+        value = Integer.loads(data[offset:end])
+        return value, end
+    if expected is ObjectIdentifier or issubclass(expected, ObjectIdentifier):
+        tag, length, start = _read_tlv_header(data, offset)
+        if tag != _TAG_OBJECT_ID:
+            raise ASN1TagError("Expected OBJECT IDENTIFIER")
+        end = start + length
+        _ensure_boundary(data, end)
+        value = ObjectIdentifier.loads(data[offset:end])
+        return value, end
+    if expected is OctetString or issubclass(expected, OctetString):
+        tag, length, start = _read_tlv_header(data, offset)
+        if tag != _TAG_OCTET_STRING:
+            raise ASN1TagError("Expected OCTET STRING")
+        end = start + length
+        _ensure_boundary(data, end)
+        value = OctetString.loads(data[offset:end])
+        return value, end
+    if expected is BitString or issubclass(expected, BitString):
+        tag, length, start = _read_tlv_header(data, offset)
+        if tag != _TAG_BIT_STRING:
+            raise ASN1TagError("Expected BIT STRING")
+        end = start + length
+        _ensure_boundary(data, end)
+        value = BitString.loads(data[offset:end])
+        return value, end
+    if issubclass(expected, Schema):
+        tag, length, start = _read_tlv_header(data, offset)
+        if tag != _TAG_SEQUENCE:
+            raise ASN1TagError(f"Expected SEQUENCE for {expected.__name__}")
+        end = start + length
+        _ensure_boundary(data, end)
+        value = expected.loads(data[offset:end])
+        return value, end
+    raise TypeError(f"Unsupported field type: {expected!r}")
+
+
+def _coerce_value(expected: Type[Any], value: Any) -> Any:
+    if expected is Integer or issubclass(expected, Integer):
+        if isinstance(value, Integer):
+            return value
+        if isinstance(value, int):
+            return Integer(value)
+        raise TypeError("Expected int for INTEGER field")
+    if expected is ObjectIdentifier or issubclass(expected, ObjectIdentifier):
+        if isinstance(value, ObjectIdentifier):
+            return value
+        if isinstance(value, tuple) or isinstance(value, list):
+            return ObjectIdentifier(tuple(int(v) for v in value))
+        raise TypeError("Expected tuple for OBJECT IDENTIFIER field")
+    if expected is OctetString or issubclass(expected, OctetString):
+        if isinstance(value, OctetString):
+            return value
+        if isinstance(value, (bytes, bytearray, memoryview)):
+            return OctetString(bytes(value))
+        raise TypeError("Expected bytes for OCTET STRING field")
+    if expected is BitString or issubclass(expected, BitString):
+        if isinstance(value, BitString):
+            return value
+        if isinstance(value, tuple) and len(value) == 2:
+            data, unused = value
+            if not isinstance(data, (bytes, bytearray, memoryview)):
+                raise TypeError("BitString data must be bytes-like")
+            return BitString(bytes(data), int(unused))
+        if isinstance(value, (bytes, bytearray, memoryview)):
+            return BitString(bytes(value), 0)
+        raise TypeError("Expected BitString or (data, unused_bits)")
+    if issubclass(expected, Schema):
+        if isinstance(value, expected):
+            return value
+        if isinstance(value, dict):
+            return expected(**value)
+        raise TypeError(f"Expected {expected.__name__} for SEQUENCE field")
+    raise TypeError(f"Unsupported field type: {expected!r}")
