@@ -28,30 +28,39 @@ pip install slh-dsa
 The functionality is extremely simple to use, as demonstrated by the following example:
 
 ```python
-from slhdsa import KeyPair, shake_256f, PublicKey
+from slhdsa import KeyPair, shake_256f, PublicKey, SecretKey
 
 # Generate the keypair
 kp = KeyPair.gen(shake_256f)
 
-# Sign the message
-sig = kp.sign(b"Hello World!")
+# Sign the message w/o randomization
+sig = kp.sign_pure(b"Hello World!", randomize=False)
 
 # Verify the signature
-kp.verify(b"Hello World!", sig)        # -> True
-kp.verify(b"Hello World!", b"I'm the hacker!") # -> False
-kp.verify(b"hello world!", sig)        # -> False
+kp.verify_pure(b"Hello World!", sig)        # -> True
+kp.verify_pure(b"Hello World!", b"I'm the hacker!") # -> False
+kp.verify_pure(b"hello world!", sig)        # -> False
 
 # Sign the message with randomization
-sig = kp.sign(b"Hello World!", randomize=True)
-kp.verify(b"Hello World!", sig)        # -> True
+sig = kp.sign_pure(b"Hello World!", randomize=True)
+kp.verify_pure(b"Hello World!", sig)        # -> True
 
 # Export the public key digest so other devices can verify the signature
 digest = kp.pub.digest()
 
 # Recover the public key from the digest
 pub = PublicKey.from_digest(digest, shake_256f)
-pub.verify(b"Hello World!", sig)       # -> True
-pub.verify(b"Hello World", sig)        # -> False
+pub.verify_pure(b"Hello World!", sig)       # -> True
+pub.verify_pure(b"Hello World", sig)        # -> False
+
+# Export the secret key in PKCS format
+kp.sec.to_pkcs("seckey.pem")
+
+# Restore the secret key from the PKCS file
+assert SecretKey.from_pkcs("seckey.pem") == kp.sec  # -> True
+
+# LowLevel APIs
+kp.verify(b'11223344', kp.sign(b'11223344'))  # -> True
 ```
 
 ## License & Copyright
