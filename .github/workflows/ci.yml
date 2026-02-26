@@ -3,6 +3,9 @@
 
 name: Test And Build
 
+permissions:
+  contents: read
+
 on:
   push:
     branches: [ "master" ]
