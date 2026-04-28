@@ -102,11 +102,11 @@ class PublicKey:
             elif par.objectid[-1] in (26, 27):
                 def prehash(data: bytes) -> bytes:
                     return (HASH_ALGORITHM_OID_PREFIX + bytes([HASH_ALGORITHMS_OID_BY_FUNCTION[hashlib.shake_128]])+
-                            hashlib.shake_128(data).digest(16))
+                            hashlib.shake_128(data).digest(32))
             elif par.objectid[-1] in (28, 29, 30, 31):
                 def prehash(data: bytes) -> bytes:
                     return (HASH_ALGORITHM_OID_PREFIX + bytes([HASH_ALGORITHMS_OID_BY_FUNCTION[hashlib.shake_256]])+
-                            hashlib.shake_256(data).digest(32))
+                            hashlib.shake_256(data).digest(64))
             else:
                 assert False
         msg = b'\x01' + bytes([len(ctx)]) + ctx + prehash(msg)
@@ -207,11 +207,11 @@ class SecretKey:
             elif self.par.objectid[-1] in (26, 27):
                 def prehash(data: bytes) -> bytes:
                     return (HASH_ALGORITHM_OID_PREFIX + bytes([HASH_ALGORITHMS_OID_BY_FUNCTION[hashlib.shake_128]])+
-                            hashlib.shake_128(data).digest(16))
+                            hashlib.shake_128(data).digest(32))
             elif self.par.objectid[-1] in (28, 29, 30, 31):
                 def prehash(data: bytes) -> bytes:
                     return (HASH_ALGORITHM_OID_PREFIX + bytes([HASH_ALGORITHMS_OID_BY_FUNCTION[hashlib.shake_256]])+
-                            hashlib.shake_256(data).digest(32))
+                            hashlib.shake_256(data).digest(64))
             else:
                 assert False
         msg = b'\x01' + bytes([len(ctx)]) + ctx + prehash(msg)
