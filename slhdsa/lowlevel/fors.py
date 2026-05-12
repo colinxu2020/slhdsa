@@ -28,24 +28,26 @@ class FORS:
             right_node = self.node(sk_seed, 2 * cur + 1, dep - 1, pk_seed, address)
             address.height = dep
             address.index = cur
-            node = self.parameter.H(pk_seed, address, left_node + right_node)
+            buf = bytearray()
+            buf.extend(left_node)
+            buf.extend(right_node)
+            node = self.parameter.H(pk_seed, address, memoryview(buf))
         return node
 
-    def sign(self, md: bytes, sk_seed: bytes, pk_seed: bytes, address: FORSTreeAddress) -> bytes:
-        fors_sign = b""
+    def sign(self, md: bytes, sk_seed: bytes, pk_seed: bytes, address: FORSTreeAddress, out: memoryview) -> None:
         indices = base2b(md, self.parameter.a, self.parameter.k)
+        offset = 0
         for i in range(self.parameter.k):
-            fors_sign += self.generate_secretkey(sk_seed, pk_seed, address, i * (1 << self.parameter.a) + indices[i])
-            auth = b""
+            out[offset:offset+self.parameter.n] = self.generate_secretkey(sk_seed, pk_seed, address, i * (1 << self.parameter.a) + indices[i])
+            offset += self.parameter.n
             for j in range(self.parameter.a):
                 s = (indices[i] // (1 << j)) ^ 1
-                auth += self.node(sk_seed, i * (1 << (self.parameter.a - j)) + s, j, pk_seed, address)
-            fors_sign += auth
-        return fors_sign
+                out[offset:offset+self.parameter.n] = self.node(sk_seed, i * (1 << (self.parameter.a - j)) + s, j, pk_seed, address)
+                offset += self.parameter.n
 
-    def publickey_from_sign(self, fors_sign: bytes, md: bytes, pk_seed: bytes, address: FORSTreeAddress) -> bytes:
+    def publickey_from_sign(self, fors_sign: memoryview, md: bytes, pk_seed: bytes, address: FORSTreeAddress) -> bytes:
         indices = base2b(md, self.parameter.a, self.parameter.k)
-        root = b""
+        root = bytearray()
         for i in range(self.parameter.k):
             sk = fors_sign[
                  i * (self.parameter.a + 1) * self.parameter.n:(i * (self.parameter.a + 1) + 1) * self.parameter.n]
@@ -57,14 +59,21 @@ class FORS:
 
             for j in range(self.parameter.a):
                 address.height = j + 1
+                auth_j = auth[j * self.parameter.n:(j + 1) * self.parameter.n]
                 if (indices[i] // (1 << j)) % 2 == 0:
                     address.index //= 2
-                    node = self.parameter.H(pk_seed, address, node + auth[j * self.parameter.n:(j + 1) * self.parameter.n])
+                    buf = bytearray()
+                    buf.extend(node)
+                    buf.extend(auth_j)
+                    node = self.parameter.H(pk_seed, address, memoryview(buf))
                 else:
                     address.index = (address.index - 1) // 2
-                    node = self.parameter.H(pk_seed, address, auth[j * self.parameter.n:(j + 1) * self.parameter.n] + node)
+                    buf = bytearray()
+                    buf.extend(auth_j)
+                    buf.extend(node)
+                    node = self.parameter.H(pk_seed, address, memoryview(buf))
 
-            root += node
+            root.extend(node)
         fors_pk_address = address.with_type(FORSRootsAddress)
         fors_pk_address.keypair = address.keypair
-        return self.parameter.Tl(pk_seed, fors_pk_address, root)
+        return self.parameter.Tl(pk_seed, fors_pk_address, memoryview(root))

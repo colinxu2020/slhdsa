@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from math import log2
+from typing import Union
 
 from slhdsa.lowlevel.parameters import Parameter
 from slhdsa.lowlevel._utils import ceil_div, base2b
@@ -25,27 +26,27 @@ class WOTS:
     wots_parameter: WOTSParameter
     parameter: Parameter
 
-    def _chain(self, key: bytes, beg: int, step: int, pk_seed: bytes, address: WOTSHashAddress) -> bytes:
+    def _chain(self, key: Union[bytes, memoryview], beg: int, step: int, pk_seed: bytes, address: WOTSHashAddress) -> bytes:
         #if beg + step >= self.wots_parameter.w:
         #    return b""
         tmp = key
         for j in range(beg, beg + step):
             address.hash = j
             tmp = self.parameter.F(pk_seed, address, tmp)
-        return tmp
+        return tmp if isinstance(tmp, bytes) else bytes(tmp)
 
     def generate_publickey(self, sk_seed: bytes, pk_seed: bytes, address: WOTSHashAddress) -> bytes:
         sk_address = address.with_type(WOTSPrfAddress)
         sk_address.keypair = address.keypair
-        tmp = b""
+        tmp = bytearray()
         for i in range(self.wots_parameter.len):
             sk_address.chain = i
             sk = self.parameter.PRF(pk_seed, sk_seed, sk_address)
             address.chain = i
-            tmp += self._chain(sk, 0, self.wots_parameter.w - 1, pk_seed, address)
+            tmp.extend(self._chain(sk, 0, self.wots_parameter.w - 1, pk_seed, address))
         wots_pk_address = address.with_type(WOTSPKAddress)
         wots_pk_address.keypair = address.keypair
-        return self.parameter.Tl(pk_seed, wots_pk_address, tmp)
+        return self.parameter.Tl(pk_seed, wots_pk_address, memoryview(tmp))
 
     def _format_message(self, msg_: bytes) -> list[int]:
         msg = base2b(msg_, self.parameter.lgw, self.wots_parameter.len1)
@@ -57,26 +58,26 @@ class WOTS:
                            self.parameter.lgw, self.wots_parameter.len2)
         return msg
 
-    def sign(self, msg_: bytes, sk_seed: bytes, pk_seed: bytes, address: WOTSHashAddress) -> bytes:
+    def sign(self, msg_: bytes, sk_seed: bytes, pk_seed: bytes, address: WOTSHashAddress, out: memoryview) -> None:
         msg = self._format_message(msg_)
         sk_address = address.with_type(WOTSPrfAddress)
         sk_address.keypair = address.keypair
-        sig = b''
+        offset = 0
         for i in range(self.wots_parameter.len):
             sk_address.chain = i
             sk = self.parameter.PRF(pk_seed, sk_seed, sk_address)
             address.chain = i
-            sig += self._chain(sk, 0, msg[i], pk_seed, address)
-        return sig
+            out[offset:offset+self.parameter.n] = self._chain(sk, 0, msg[i], pk_seed, address)
+            offset += self.parameter.n
 
-    def publickey_from_sign(self, sig: bytes, msg_: bytes, pk_seed: bytes, address: WOTSHashAddress) -> bytes:
+    def publickey_from_sign(self, sig: memoryview, msg_: bytes, pk_seed: bytes, address: WOTSHashAddress) -> bytes:
         msg = self._format_message(msg_)
-        tmp = b''
+        tmp = bytearray()
         for i in range(self.wots_parameter.len):
             address.chain = i
-            tmp += self._chain(sig[i * self.parameter.n:(i + 1) * self.parameter.n], msg[i],
-                               self.wots_parameter.w - 1 - msg[i], pk_seed, address)
+            tmp.extend(self._chain(sig[i * self.parameter.n:(i + 1) * self.parameter.n], msg[i],
+                               self.wots_parameter.w - 1 - msg[i], pk_seed, address))
         wots_pk_address = address.with_type(WOTSPKAddress)
         wots_pk_address.keypair = address.keypair
-        pk = self.parameter.Tl(pk_seed, wots_pk_address, tmp)
+        pk = self.parameter.Tl(pk_seed, wots_pk_address, memoryview(tmp))
         return pk

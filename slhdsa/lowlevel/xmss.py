@@ -30,33 +30,41 @@ class XMSS:
             val = self.parameter.H(pk_seed, address, left_node + right_node)
         return val
 
-    def sign(self, msg: bytes, sk_seed: bytes, idx: int, pk_seed: bytes, address: Address) -> bytes:
-        auth = b''
+    def sign(self, msg: bytes, sk_seed: bytes, idx: int, pk_seed: bytes, address: Address, out: memoryview) -> None:
+        address_wots = address.with_type(WOTSHashAddress)
+        address_wots.keypair = idx
+        wots_sig_len = self.parameter.n * self.wots.wots_parameter.len
+        self.wots.sign(msg, sk_seed, pk_seed, address_wots, out[:wots_sig_len])
+
+        offset = wots_sig_len
         for j in range(self.parameter.h_m):
             k = (idx // (1 << j)) ^ 1
-            auth += self.node(sk_seed, k, j, pk_seed, address)
+            out[offset:offset+self.parameter.n] = self.node(sk_seed, k, j, pk_seed, address)
+            offset += self.parameter.n
 
-        address = address.with_type(WOTSHashAddress)
-        address.keypair = idx
-        sig = self.wots.sign(msg, sk_seed, pk_seed, address)
-        return sig + auth
-
-    def public_key_from_sign(self, idx: int, sig: bytes, msg: bytes, pk_seed: bytes, address: Address) -> bytes:
-        address = address.with_type(WOTSHashAddress)
-        address.keypair = idx
-        auth = sig[self.parameter.n * self.wots.wots_parameter.len:(
-                                                                               self.wots.wots_parameter.len + self.parameter.h_m) * self.parameter.n]
-        sig = sig[:self.parameter.n * self.wots.wots_parameter.len]
-        node = self.wots.publickey_from_sign(sig, msg, pk_seed, address)
+    def public_key_from_sign(self, idx: int, sig: memoryview, msg: bytes, pk_seed: bytes, address: Address) -> bytes:
+        address_wots = address.with_type(WOTSHashAddress)
+        address_wots.keypair = idx
+        wots_sig_len = self.parameter.n * self.wots.wots_parameter.len
+        auth = sig[wots_sig_len:wots_sig_len + self.parameter.h_m * self.parameter.n]
+        wots_sig = sig[:wots_sig_len]
+        node = self.wots.publickey_from_sign(wots_sig, msg, pk_seed, address_wots)
         address = address.with_type(TreeAddress)
         address.index = idx
 
         for k in range(self.parameter.h_m):
             address.height = k + 1
+            auth_k = auth[k * self.parameter.n:(k + 1) * self.parameter.n]
             if (idx // (1 << k)) % 2 == 0:
                 address.index //= 2
-                node = self.parameter.H(pk_seed, address, node + auth[k * self.parameter.n:(k + 1) * self.parameter.n])
+                buf = bytearray()
+                buf.extend(node)
+                buf.extend(auth_k)
+                node = self.parameter.H(pk_seed, address, memoryview(buf))
             else:
                 address.index = (address.index - 1) // 2
-                node = self.parameter.H(pk_seed, address, auth[k * self.parameter.n:(k + 1) * self.parameter.n] + node)
+                buf = bytearray()
+                buf.extend(auth_k)
+                buf.extend(node)
+                node = self.parameter.H(pk_seed, address, memoryview(buf))
         return node

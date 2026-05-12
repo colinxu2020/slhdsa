@@ -32,7 +32,13 @@ def sign(msg: bytes, secret_key: tuple[bytes, bytes, bytes, bytes], par: Paramet
     else:
         opt_rand = pk_seed
     r = par.PRFmsg(sk_prf, opt_rand, msg)
-    sig = r
+    
+    sig_len = (1 + par.k * (par.a + 1) + par.h + par.d * WOTSParameter(par).len) * par.n
+    sig_buf = bytearray(sig_len)
+    sig_view = memoryview(sig_buf)
+    
+    sig_view[:par.n] = r
+    offset = par.n
 
     digest = par.Hmsg(r, pk_seed, pk_root, msg)
     md = digest[:ceil_div(par.k * par.a, 8)]
@@ -47,22 +53,27 @@ def sign(msg: bytes, secret_key: tuple[bytes, bytes, bytes, bytes], par: Paramet
     address.tree = tree_idx
     address.keypair = leaf_idx
     fors = FORS(par)
-    fors_sign = fors.sign(md, sk_seed, pk_seed, address)
-    sig += fors_sign
-    fors_pk = fors.publickey_from_sign(fors_sign, md, pk_seed, address)
-    ht_sign = HyperTree(par).sign(fors_pk, sk_seed, pk_seed, tree_idx, leaf_idx)
-    sig += ht_sign
-    return sig
+    
+    fors_sign_len = par.k * (par.a + 1) * par.n
+    fors.sign(md, sk_seed, pk_seed, address, sig_view[offset:offset+fors_sign_len])
+    fors_pk = fors.publickey_from_sign(sig_view[offset:offset+fors_sign_len], md, pk_seed, address)
+    offset += fors_sign_len
+    
+    ht_sign_len = (par.h + par.d * WOTSParameter(par).len) * par.n
+    HyperTree(par).sign(fors_pk, sk_seed, pk_seed, tree_idx, leaf_idx, sig_view[offset:offset+ht_sign_len])
+    
+    return bytes(sig_buf)
 
 
 def verify(msg: bytes, sig: bytes, public_key: tuple[bytes, bytes], par: Parameter) -> bool:
     if len(sig) != (1 + par.k * (par.a + 1) + par.h + par.d * WOTSParameter(par).len) * par.n:
         return False
+    sig_view = memoryview(sig)
     address = FORSTreeAddress(0, 0)
     pk_seed, pk_root = public_key
-    r = sig[:par.n]
-    fors_sign = sig[par.n:(1 + par.k * (par.a + 1)) * par.n]
-    ht_sign_ = sig[(1 + par.k * (par.a + 1)) * par.n:]
+    r = sig_view[:par.n]
+    fors_sign = sig_view[par.n:(1 + par.k * (par.a + 1)) * par.n]
+    ht_sign_ = sig_view[(1 + par.k * (par.a + 1)) * par.n:]
     digest = par.Hmsg(r, pk_seed, pk_root, msg)
     md = digest[:ceil_div(par.k * par.a, 8)]
     tree_id = int.from_bytes(
