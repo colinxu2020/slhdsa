@@ -48,7 +48,7 @@ setup(
     license = metadata["license"],
     py_modules = [],
     ext_modules = ext_modules,
-    packages = ['slhdsa'],
+    packages = find_packages(),
     classifiers = metadata["classifiers"],
     install_requires = metadata["dependencies"],
     python_requires = metadata["requires-python"],
