@@ -18,6 +18,9 @@ except ModuleNotFoundError:
 
 
 if os.getenv('SLHDSA_BUILD_OPTIMIZED', '0') == '1' or os.getenv('CIBUILDWHEEL', '0') == '1':
+    if sys.version_info < (3, 10, 0):
+        sys.stderr.write("ERROR: You need Python 3.10 or later to build optimized slh-dsa.\n")
+        exit(1)
     mypyc_targets = []
     print('Building Optimized Library')
     
