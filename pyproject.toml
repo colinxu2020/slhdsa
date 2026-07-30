@@ -37,7 +37,7 @@ keywords = ['fips205', 'slhdsa', 'sphincs', 'sphincsplus', 'crypto', 'cryptograp
 "Bug Tracker" = "https://github.com/colinxu2020/slhdsa/issues"
 
 [build-system]
-requires = ["setuptools>=61", "wheel", "mypy>=1.10.1", "tomli>=1.1.0; python_version<'3.11'"]
+requires = ["setuptools>=61", "wheel", "mypy>=2.2", "tomli>=1.1.0; python_version<'3.11'"]
 build-backend = "setuptools.build_meta"
 
 [tool.pdm]
