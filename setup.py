@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-import glob
 import os
 from pathlib import Path
 import sys
@@ -9,7 +8,7 @@ if sys.version_info < (3, 9, 0):
     sys.stderr.write("ERROR: You need Python 3.9 or later to use slh-dsa yet.\n")
     exit(1)
 
-from setuptools import Extension, find_packages, setup
+from setuptools import find_packages, setup
 
 try:
     import tomllib
@@ -24,7 +23,7 @@ if os.getenv('SLHDSA_BUILD_OPTIMIZED', '0') == '1' or os.getenv('CIBUILDWHEEL', 
     mypyc_targets = []
     print('Building Optimized Library')
     
-    for pth in Path('slhdsa').glob('**/*.py'):
+    for pth in Path('slhdsa').glob('lowlevel/*.py'):
         if pth.name != '__init__.py':
             mypyc_targets.append(pth.as_posix().replace('/', os.sep))
 
@@ -51,7 +50,7 @@ setup(
     license = metadata["license"],
     py_modules = [],
     ext_modules = ext_modules,
-    packages = find_packages(),
+    packages = find_packages(exclude=("tests", "tests.*")),
     classifiers = metadata["classifiers"],
     install_requires = metadata["dependencies"],
     python_requires = metadata["requires-python"],
