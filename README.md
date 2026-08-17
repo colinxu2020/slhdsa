@@ -17,6 +17,13 @@ This project offers the following features:
 5. ⚒️ **Designed for humans!**
 6. 🎉 **More features coming soon!**
 
+## Notice
+
+**Python 3.9 support will be dropped in v1.0.**
+
+v0.2.5 is the last release that supports Python 3.9.
+If you need to continue using Python 3.9, please pin the package to v0.2.5. 
+
 ## Installation
 
 ```bash
