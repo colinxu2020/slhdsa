@@ -1,0 +1,5 @@
+# mypyc generates one shared implementation extension and lightweight shim
+# extensions for individual Python modules.  These shims intentionally have
+# no ELF DT_NEEDED entries; they obtain their initialization functions from
+# the main mypyc extension via Python capsules.
+python3-slhdsa: shared-library-lacks-prerequisites [usr/lib/python3/dist-packages/slhdsa/lowlevel/*.so]

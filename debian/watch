@@ -1,0 +1,4 @@
+Version: 5
+Template: Pypi
+Dist: SLH-DSA
+Matching-Pattern: slh_dsa-@ANY_VERSION@@ARCHIVE_EXT@

@@ -1,0 +1,8 @@
+#!/usr/bin/make -f
+
+export PYBUILD_NAME = slhdsa
+export PYBUILD_SYSTEM = pyproject
+export SLHDSA_BUILD_OPTIMIZED = 1
+
+%:
+	dh $@ --buildsystem=pybuild

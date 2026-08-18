@@ -1,0 +1,33 @@
+Source: python-slh-dsa
+Section: python
+Priority: optional
+Maintainer: Xu Colin <colinxu2020@gmail.com>
+Build-Depends:
+ debhelper-compat (= 13),
+ dh-sequence-python3,
+ pybuild-plugin-pyproject,
+ python3-all-dev,
+ python3-setuptools (>= 61),
+ python3-wheel,
+ python3-mypy (>= 2.2.0),
+ python3-pytest <!nocheck>
+Standards-Version: 4.7.4
+Rules-Requires-Root: no
+Testsuite: autopkgtest-pkg-pybuild
+Homepage: https://github.com/colinxu2020/slhdsa
+Vcs-Git:  https://github.com/colinxu2020/slhdsa.git
+Vcs-Browser:  https://github.com/colinxu2020/slhdsa
+
+Package: python3-slhdsa
+Architecture: any
+Depends:
+ ${misc:Depends},
+ ${python3:Depends},
+ ${shlibs:Depends}
+Description: Python implementation of the SLH-DSA signature algorithm
+ SLH-DSA is a stateless hash-based digital signature algorithm standardized
+ in FIPS 205 and derived from SPHINCS+.
+ .
+ This package provides the slhdsa module for Python 3. It has no external
+ Python runtime dependencies and is built with mypyc native extensions for
+ improved performance.

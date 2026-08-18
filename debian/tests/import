@@ -1,0 +1,20 @@
+#!/bin/sh
+set -eu
+
+python3 - <<'PY'
+from pathlib import Path
+import slhdsa
+
+package_dir = Path(slhdsa.__file__).resolve().parent
+extensions = list(package_dir.rglob("*.so"))
+
+assert extensions, (
+    f"No mypyc extension modules found under {package_dir}; "
+    "the package may have been built in pure-Python mode"
+)
+
+print(f"Imported slhdsa from: {slhdsa.__file__}")
+print("Compiled extensions:")
+for extension in extensions:
+    print(f"  {extension}")
+PY
